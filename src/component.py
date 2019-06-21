@@ -78,7 +78,11 @@ class Component(KBCEnvHandler):
 	        "sasl.mechanisms": "SCRAM-SHA-256",
             "sasl.username": params.get(KBC_USERNAME),
             "sasl.password": params.get(KBC_PASSWORD),
+            #"auto.offset.reset": "smallest"
+            #"auto.offset.reset": "earliest"
             "auto.offset.reset": "smallest"
+            "enable.auto.commit": True
+            ""
             }
 
         if offset == 0:
@@ -89,7 +93,7 @@ class Component(KBCEnvHandler):
         topics = (params.get(KBC_TOPIC)).split(",")
         
         # Get data
-        self.extract_data(conf, offset, topics)
+        self.extract_data(conf, offset, topics, servers)
 
         # TODO there should be a function to kill this based on the offset
         logging.info("Extraction finished.")
@@ -98,7 +102,7 @@ class Component(KBCEnvHandler):
         self.create_sliced_tables(self, "kafka")
 
 
-    def extract_data(self, conf, offset, topics):
+    def extract_data(self, conf, offset, topics, servers):
         """
         Consumer configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
@@ -111,6 +115,9 @@ class Component(KBCEnvHandler):
 
         # Setup
         c = Consumer(**conf)
+
+        print(c.assignment(servers))
+        #print(c.committed)
     
         # Subscribe to the topic
         c.subscribe(topics)
@@ -149,17 +156,24 @@ class Component(KBCEnvHandler):
             # Save data as a sliced table file in defined folder
             self.save_file(extracted_data, filename)
 
+            # will be changed
+            new_offset = msg.offset()
+
+            # Store previous offset
+            state_dict = {"offset": new_offset}
+            self.write_state_file(state_dict)
+            logging.info("Offset file stored.")
+
+            """
+            this is not needed since "enable.auto.commit": True
+            print(msg)
+            c.commit(msg)
+            """
+
         # Close down consumer to commit final offsets.
         c.close()
         logging.info("Session closed.")
         
-        # will be changed
-        new_offset = msg.offset()
-
-        # Store previous offset
-        state_dict = {"offset": new_offset}
-        self.write_state_file(state_dict)
-        logging.info("Offset file stored.")
 
 
     def save_file(self, line, filename):
