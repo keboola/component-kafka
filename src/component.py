@@ -119,7 +119,8 @@ class Component(KBCEnvHandler):
 
         # Data extraction
         while True:
-            msg = c.poll(timeout=1.0)
+            msg = c.poll()
+            logging.info("Reading...")
             if msg is None:
                 continue
             if msg.error():
@@ -150,6 +151,7 @@ class Component(KBCEnvHandler):
 
         # Close down consumer to commit final offsets.
         c.close()
+        logging.info("Session closed.")
         
         # will be changed
         new_offset = msg.offset()
@@ -157,6 +159,7 @@ class Component(KBCEnvHandler):
         # Store previous offset
         state_dict = {"offset": new_offset}
         self.write_state_file(state_dict)
+        logging.info("Offset file stored.")
 
 
     def save_file(self, line, filename):
