@@ -33,11 +33,11 @@ class Kbcconsumer():
         self.consumer = Consumer(**configuration)
         print(self.consumer.assignment(servers))
 
-    def _set_start_offsets(self, consumer, partitions, **kwargs):
+    def _set_start_offsets(self, consumer, partitions):
         logging.debug(F'Setting starting offsets {self.start_offset} for partitions: {partitions}')
         if self.start_offset:
             for p in partitions:
-                p.offset = self.start_offset.get(p.partition, 0)
+                p.offset = self.start_offset.get(str(p.partition), 0)
         else:
             for p in partitions:
                 p.offset = 0

@@ -7,13 +7,14 @@ import logging
 import os
 import sys
 
+import csv
 from kbc.env_handler import KBCEnvHandler
 
 from kafka_kbc.client import Kbcconsumer
 
 # global constants
-RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'offset', 'key']
-RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'offset', 'key',
+RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
+RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key',
                'value']
 
 # configuration variables
@@ -21,18 +22,18 @@ KBC_SERVERS = "servers"
 KBC_GROUP_ID = "group_id"
 KBC_USERNAME = "username"
 KBC_PASSWORD = "password"
-KBC_DURATION = "duration"  # in seconds
 KBC_TOPIC = "topic"
+KBC_BEGIN_OFFSET = "begin_offsets"
 DEBUG = "debug"
 
 APP_VERSION = "0.0.1"
 
-MANDATORY_PARS = [KBC_SERVERS, KBC_GROUP_ID, KBC_TOPIC, KBC_USERNAME, KBC_PASSWORD, KBC_DURATION, DEBUG]
+MANDATORY_PARS = [KBC_SERVERS, KBC_GROUP_ID, KBC_TOPIC, KBC_USERNAME, KBC_PASSWORD]
 
 
 class Component(KBCEnvHandler):
+    def __init__(self, debug=False):
 
-    def __init__(self, debug=True):
         KBCEnvHandler.__init__(self, MANDATORY_PARS)
         # override debug from config
         if self.cfg_params.get('debug'):
@@ -67,9 +68,14 @@ class Component(KBCEnvHandler):
         servers = ",".join(params.get(KBC_SERVERS))
 
         # Get current state file for offset, 0 if empty
-        prev_offsets = self.get_state_file().get("prev_offsets", dict())
+        if params.get(KBC_BEGIN_OFFSET):
+            logging.info(F'Begin offset specified, overriding with {params.get(KBC_BEGIN_OFFSET)}')
+            prev_offsets = params.get(KBC_BEGIN_OFFSET)
+        else:
+            logging.info('Loading state file..')
+            prev_offsets = self.get_state_file().get("prev_offsets", dict())
 
-        if prev_offsets:
+        if not prev_offsets:
             logging.info("Extracting data from the beginning")
         else:
             logging.info("Extracting data from previous offsets: {0}".format(prev_offsets))
@@ -92,15 +98,14 @@ class Component(KBCEnvHandler):
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            extracted_data = (("{0}, {1}, {2}, {3}, {4}, {5}, {6}").format(
-                msg.topic(),
-                msg.timestamp()[0],
-                msg.timestamp()[1],
-                msg.partition(),
-                msg.offset(),
-                msg.key(),
-                msg.value().decode('utf-8'),
-            ))
+            extracted_data = {
+                'topic': msg.topic(),
+                'timestamp_type': msg.timestamp()[0],
+                'timestamp': msg.timestamp()[1],
+                'partition': msg.partition(),
+                'offset': msg.offset(),
+                'key': msg.key(),
+                'value': msg.value().decode('utf-8')}
 
             filename = (("{0}-{1}-{2}.csv").format(
                 msg.topic(),
@@ -133,17 +138,14 @@ class Component(KBCEnvHandler):
         """
         Save text as file
         """
+        logging.info(F'Writing file {filename}')
 
-        # file_path = os.path.join(filename)
-
-        print(filename)
-        logging.info(filename)
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         try:
             with open(filename, 'w') as file:
-                file.write(line)
-                file.write('\n')
+                writer = csv.DictWriter(file, fieldnames=RESULT_COLS)
+                writer.writerow(line)
             logging.info("File saved.")
         except Exception as e:
             logging.error("Could not save file! exit.", e)
