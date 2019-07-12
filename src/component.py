@@ -4,196 +4,151 @@ Template Component main class.
 """
 
 import logging
-import sys
 import os
-import json
-#import time
-#from datetime import datetime
+import sys
 
+import csv
 from kbc.env_handler import KBCEnvHandler
 
-from confluent_kafka import Consumer, KafkaException, KafkaError
+from kafka_kbc.client import Kbcconsumer
 
 # global constants
+RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
+RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key',
+               'value']
 
 # configuration variables
 KBC_SERVERS = "servers"
 KBC_GROUP_ID = "group_id"
 KBC_USERNAME = "username"
 KBC_PASSWORD = "password"
-KBC_DURATION = "duration" # in seconds
 KBC_TOPIC = "topic"
+KBC_BEGIN_OFFSET = "begin_offsets"
 DEBUG = "debug"
 
 APP_VERSION = "0.0.1"
 
-MANDATORY_PARS = [KBC_SERVERS, KBC_GROUP_ID, KBC_TOPIC, KBC_USERNAME, KBC_PASSWORD, KBC_DURATION, DEBUG]
+MANDATORY_PARS = [KBC_SERVERS, KBC_GROUP_ID, KBC_TOPIC, KBC_USERNAME, KBC_PASSWORD]
 
 
 class Component(KBCEnvHandler):
-
     def __init__(self, debug=False):
+
         KBCEnvHandler.__init__(self, MANDATORY_PARS)
         # override debug from config
-        if self.cfg_params.get(DEBUG):
+        if self.cfg_params.get('debug'):
             debug = True
-                # Create output folder
 
-        self.set_default_logger("DEBUG" if debug else "INFO")
-        logging.info("Running version %s", APP_VERSION)
-        logging.info("Loading configuration...")
+        self.set_default_logger('DEBUG' if debug else 'INFO')
+        logging.info('Running version %s', APP_VERSION)
+        logging.info('Loading configuration...')
 
         try:
-            self.validateConfig()
+            self.validate_config()
+
         except ValueError as e:
             logging.error(e)
             exit(1)
-
 
     def run(self):
         """
         Main execution code
 
         TODO - statistics when DEBUG in conf dict:
-        stats_cb(json_str): Callback for statistics data. This callback is triggered by poll() or flush every statistics.interval.ms (needs to be configured separately). Function argument json_str is a str instance of a JSON document containing statistics data. This callback is served upon calling client.poll() or producer.flush(). See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
+        stats_cb(json_str): Callback for statistics data. This callback is triggered by poll() or
+        flush every statistics.interval.ms (needs to be configured separately).
+         Function argument json_str is a str instance of a JSON document containing
+         statistics data. This callback is served upon calling client.poll() or producer.flush().
+         See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
         params = self.cfg_params  # noqa
 
         # Generating a string out of the list
         servers = ",".join(params.get(KBC_SERVERS))
-        
 
         # Get current state file for offset, 0 if empty
-        try:
-            offset = self.get_state_file()["offset"]
-        except:
-            offset = 0
-
-        conf = {
-            "bootstrap.servers": servers,
-            "group.id": "%s-consumer" % params.get(KBC_GROUP_ID),
-            "session.timeout.ms": 6000,
-            "security.protocol": "SASL_SSL",
-	        "sasl.mechanisms": "SCRAM-SHA-256",
-            "sasl.username": params.get(KBC_USERNAME),
-            "sasl.password": params.get(KBC_PASSWORD),
-            #"auto.offset.reset": "smallest"
-            #"auto.offset.reset": "earliest"
-            "auto.offset.reset": "smallest"
-            "enable.auto.commit": True
-            ""
-            }
-
-        if offset == 0:
-            logging.info("Extracting data from the beginninng")
+        if params.get(KBC_BEGIN_OFFSET):
+            logging.info(F'Begin offset specified, overriding with {params.get(KBC_BEGIN_OFFSET)}')
+            prev_offsets = params.get(KBC_BEGIN_OFFSET)
         else:
-            logging.info("Extracting data from previous offset: {0}".format(offset))
+            logging.info('Loading state file..')
+            prev_offsets = self.get_state_file().get("prev_offsets", dict())
+
+        if not prev_offsets:
+            logging.info("Extracting data from the beginning")
+        else:
+            logging.info("Extracting data from previous offsets: {0}".format(prev_offsets))
 
         topics = (params.get(KBC_TOPIC)).split(",")
-        
-        # Get data
-        self.extract_data(conf, offset, topics, servers)
-
-        # TODO there should be a function to kill this based on the offset
-        logging.info("Extraction finished.")
-
-        # Produce final sliced table
-        self.create_sliced_tables(self, "kafka")
-
-
-    def extract_data(self, conf, offset, topics, servers):
-        """
-        Consumer configuration
-        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-        """
-        
-        logging.info("Extracting data from topics {0}".format(topics))
-
-        # Destination folder is the name of the topic
-        destination_folder = topics
 
         # Setup
-        c = Consumer(**conf)
+        c = Kbcconsumer(servers, "%s-consumer" % params.get(KBC_GROUP_ID), "test", params.get(KBC_USERNAME),
+                        params.get(KBC_PASSWORD), logging.getLogger(), start_offset=prev_offsets)
 
-        print(c.assignment(servers))
-        #print(c.committed)
-    
-        # Subscribe to the topic
-        c.subscribe(topics)
+        logging.info("Extracting data from topics {0}".format(topics))
 
-        logging.info("Subscribed to the topic ^")
+        res_file_folder = os.path.join(self.tables_out_path, 'kafka_results')
 
-        # Data extraction
-        while True:
-            msg = c.poll()
-            logging.info("Reading...")
+        latest_offsets = dict()
+        for msg in c.consume_message_batch(topics):
             if msg is None:
-                continue
+                break
             if msg.error():
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            extracted_data = (("{0}, {1}, {2}, {3}, {4}, {5}, {6}").format(
-                    msg.topic(),
-                    msg.timestamp()[0],
-                    msg.timestamp()[1],
-                    msg.partition(),
-                    msg.offset(),
-                    msg.key(),
-                    msg.value().decode('utf-8'),
-                    ))
-            
-            filename = (("{0}-{1}-{2}.csv").format(
-                    msg.topic(),
-                    msg.timestamp()[0],
-                    msg.timestamp()[1],
-                    ))
+            extracted_data = {
+                'topic': msg.topic(),
+                'timestamp_type': msg.timestamp()[0],
+                'timestamp': msg.timestamp()[1],
+                'partition': msg.partition(),
+                'offset': msg.offset(),
+                'key': msg.key(),
+                'value': msg.value().decode('utf-8')}
 
-            logging.info(extracted_data)
-            # json.dumps(v).encode('utf-8')
+            filename = (("{0}-{1}-{2}.csv").format(
+                msg.topic(),
+                msg.timestamp()[0],
+                msg.timestamp()[1],
+            ))
+
+            logging.debug(F'Received message: {extracted_data}')
 
             # Save data as a sliced table file in defined folder
-            self.save_file(extracted_data, filename)
+            self.save_file(extracted_data, os.path.join(res_file_folder, filename))
 
             # will be changed
-            new_offset = msg.offset()
+            latest_offsets[msg.partition()] = msg.offset()
 
-            # Store previous offset
-            state_dict = {"offset": new_offset}
-            self.write_state_file(state_dict)
-            logging.info("Offset file stored.")
+        # Store previous offsets
+        state_dict = {"prev_offsets": latest_offsets}
+        self.write_state_file(state_dict)
+        logging.info("Offset file stored.")
 
-            """
-            this is not needed since "enable.auto.commit": True
-            print(msg)
-            c.commit(msg)
-            """
+        logging.info("Extraction finished.")
 
-        # Close down consumer to commit final offsets.
-        c.close()
-        logging.info("Session closed.")
-        
-
+        # Produce final sliced table manifest
+        self.configuration.write_table_manifest(res_file_folder,
+                                                primary_key=RESULT_PK,
+                                                columns=RESULT_COLS,
+                                                incremental=True)
 
     def save_file(self, line, filename):
         """
         Save text as file
         """
+        logging.info(F'Writing file {filename}')
 
-        #file_path = os.path.join(filename)
-
-        print(filename)
-        logging.info(filename)
-
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
         try:
             with open(filename, 'w') as file:
-                file.write(line)
-                file.write('\n')
+                writer = csv.DictWriter(file, fieldnames=RESULT_COLS)
+                writer.writerow(line)
             logging.info("File saved.")
-        except:
-            logging.error("Could not save file! exit.")
-
+        except Exception as e:
+            logging.error("Could not save file! exit.", e)
 
 
 if __name__ == "__main__":
