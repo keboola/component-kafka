@@ -1,5 +1,4 @@
 import logging
-import sys
 
 from confluent_kafka import Consumer, TopicPartition
 
@@ -25,7 +24,7 @@ class Kbcconsumer():
             "enable.auto.commit": True
         }
 
-        if start_offset == 0:
+        if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")
         else:
             logging.info("Start offset specified, continue from previous state: {0}".format(start_offset))
@@ -38,7 +37,10 @@ class Kbcconsumer():
         logging.debug(F'Setting starting offsets {self.start_offset} for partitions: {partitions}')
         if self.start_offset:
             for p in partitions:
-                p.offset = self.start_offset.get(p.partition, -1001)
+                p.offset = self.start_offset.get(p.partition, 0)
+        else:
+            for p in partitions:
+                p.offset = 0
 
         consumer.assign(partitions)
 
@@ -57,8 +59,6 @@ class Kbcconsumer():
             logging.info("Reading...")
             consume_pars = dict()
             consume_pars['timeout'] = NEXT_MSG_TIMEOUT
-            # if not self.start_offset:
-            #     consume_pars['num_messages'] = MAX_MSGS_COLD
 
             msgs = self.consumer.consume(**consume_pars)
             if not msgs:
@@ -70,14 +70,26 @@ class Kbcconsumer():
                 if msg is None:
                     continue
 
+                if max_offsets.get(msg.partition()) == msg.offset():
+                    max_offsets.pop(msg.partition())
+
+                # if all partitions max offset was reached, end
+                if not max_offsets:
+                    do_poll = False
+
                 yield msg
 
     def _get_max_offsets(self, topic):
         logging.debug('Getting offset boundaries for all partitions.')
         offsets = dict()
-        curr_topics = self.consumer.list_topics()
-        for p in curr_topics.topics[topic].partitions:
+        curr_topics = self.consumer.list_topics().topics
+        if not curr_topics.get(topic):
+            raise ValueError(F'The topic: "{topic}" does not exist. Available topics are: {curr_topics}')
+        for p in curr_topics[topic].partitions:
             boundaries = self.consumer.get_watermark_offsets(TopicPartition(topic, p))
-            offsets[p] = boundaries[1]
+            # store only if there are some new messages
+            if boundaries[1] > 0:
+                # decrement to get max existing offset
+                offsets[p] = boundaries[1] - 1
 
         return offsets

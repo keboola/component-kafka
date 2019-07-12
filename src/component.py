@@ -4,16 +4,17 @@ Template Component main class.
 """
 
 import logging
+import os
 import sys
 
-from confluent_kafka import Consumer
 from kbc.env_handler import KBCEnvHandler
+
 from kafka_kbc.client import Kbcconsumer
 
-# import time
-# from datetime import datetime
-
 # global constants
+RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'offset', 'key']
+RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'offset', 'key',
+               'value']
 
 # configuration variables
 KBC_SERVERS = "servers"
@@ -53,7 +54,11 @@ class Component(KBCEnvHandler):
         Main execution code
 
         TODO - statistics when DEBUG in conf dict:
-        stats_cb(json_str): Callback for statistics data. This callback is triggered by poll() or flush every statistics.interval.ms (needs to be configured separately). Function argument json_str is a str instance of a JSON document containing statistics data. This callback is served upon calling client.poll() or producer.flush(). See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
+        stats_cb(json_str): Callback for statistics data. This callback is triggered by poll() or
+        flush every statistics.interval.ms (needs to be configured separately).
+         Function argument json_str is a str instance of a JSON document containing
+         statistics data. This callback is served upon calling client.poll() or producer.flush().
+         See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
         params = self.cfg_params  # noqa
@@ -62,40 +67,24 @@ class Component(KBCEnvHandler):
         servers = ",".join(params.get(KBC_SERVERS))
 
         # Get current state file for offset, 0 if empty
-        try:
-            offset = self.get_state_file()["offset"]
-        except:
-            offset = 0
+        prev_offsets = self.get_state_file().get("prev_offsets", dict())
 
-        conf = {
-            "bootstrap.servers": servers,
-            "group.id": "%s-consumer" % params.get(KBC_GROUP_ID),
-            "client.id": "test",
-            "session.timeout.ms": 6000,
-            "security.protocol": "SASL_SSL",
-            "sasl.mechanisms": "SCRAM-SHA-256",
-            "sasl.username": params.get(KBC_USERNAME),
-            "sasl.password": params.get(KBC_PASSWORD),
-            # "auto.offset.reset": "smallest"
-            "auto.offset.reset": "earliest",
-            # "auto.offset.reset": "smallest",
-            "enable.auto.commit": True,
-            "logger": logging.getLogger()
-
-        }
-
-        if offset == 0:
-            logging.info("Extracting data from the beginninng")
+        if prev_offsets:
+            logging.info("Extracting data from the beginning")
         else:
-            logging.info("Extracting data from previous offset: {0}".format(offset))
+            logging.info("Extracting data from previous offsets: {0}".format(prev_offsets))
 
         topics = (params.get(KBC_TOPIC)).split(",")
 
         # Setup
         c = Kbcconsumer(servers, "%s-consumer" % params.get(KBC_GROUP_ID), "test", params.get(KBC_USERNAME),
-                        params.get(KBC_PASSWORD), logging.getLogger(), start_offset={3: 251764, 4: 243723})
+                        params.get(KBC_PASSWORD), logging.getLogger(), start_offset=prev_offsets)
 
         logging.info("Extracting data from topics {0}".format(topics))
+
+        res_file_folder = os.path.join(self.tables_out_path, 'kafka_results')
+
+        latest_offsets = dict()
         for msg in c.consume_message_batch(topics):
             if msg is None:
                 break
@@ -119,28 +108,26 @@ class Component(KBCEnvHandler):
                 msg.timestamp()[1],
             ))
 
-            logging.info(extracted_data)
-            # json.dumps(v).encode('utf-8')
+            logging.debug(F'Received message: {extracted_data}')
 
             # Save data as a sliced table file in defined folder
-            self.save_file(extracted_data, filename)
+            self.save_file(extracted_data, os.path.join(res_file_folder, filename))
 
             # will be changed
-            new_offset = msg.offset()
+            latest_offsets[msg.partition()] = msg.offset()
 
-            # Store previous offset
-            state_dict = {"offset": new_offset}
-            self.write_state_file(state_dict)
-            logging.info("Offset file stored.")
+        # Store previous offsets
+        state_dict = {"prev_offsets": latest_offsets}
+        self.write_state_file(state_dict)
+        logging.info("Offset file stored.")
 
-        # Get data
-        # self.extract_data(c, offset, topics, servers)
-
-        # TODO there should be a function to kill this based on the offset
         logging.info("Extraction finished.")
 
-        # Produce final sliced table
-        self.create_sliced_tables(self, "kafka")
+        # Produce final sliced table manifest
+        self.configuration.write_table_manifest(res_file_folder,
+                                                primary_key=RESULT_PK,
+                                                columns=RESULT_COLS,
+                                                incremental=True)
 
     def save_file(self, line, filename):
         """
@@ -151,14 +138,15 @@ class Component(KBCEnvHandler):
 
         print(filename)
         logging.info(filename)
-
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
         try:
             with open(filename, 'w') as file:
                 file.write(line)
                 file.write('\n')
             logging.info("File saved.")
-        except:
-            logging.error("Could not save file! exit.")
+        except Exception as e:
+            logging.error("Could not save file! exit.", e)
 
 
 if __name__ == "__main__":
