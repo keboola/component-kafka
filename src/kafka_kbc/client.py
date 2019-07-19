@@ -2,7 +2,7 @@ import logging
 
 from confluent_kafka import Consumer, TopicPartition
 
-# maximum time (s) the consumer is waiting for next message (applies for first run)
+# maximum time (s) the consumer is waiting for next message
 NEXT_MSG_TIMEOUT = 60
 
 
@@ -29,7 +29,12 @@ class Kbcconsumer():
         else:
             logging.info("Start offset specified, continue from previous state: {0}".format(start_offset))
 
-        self.start_offset = start_offset
+        # convert offset keys to proper format
+        conv_offsets = dict()
+        for off in start_offset:
+            conv_offsets[off.replace('p', '')] = start_offset[off]
+
+        self.start_offset = conv_offsets
         self.consumer = Consumer(**configuration)
         print(self.consumer.assignment(servers))
 
