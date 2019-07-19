@@ -21,7 +21,7 @@ RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'k
 KBC_SERVERS = "servers"
 KBC_GROUP_ID = "group_id"
 KBC_USERNAME = "username"
-KBC_PASSWORD = "password"
+KBC_PASSWORD = "#password"
 KBC_TOPIC = "topic"
 KBC_BEGIN_OFFSET = "begin_offsets"
 DEBUG = "debug"
@@ -44,7 +44,7 @@ class Component(KBCEnvHandler):
         logging.info('Loading configuration...')
 
         try:
-            self.validate_config()
+            self.validate_config(MANDATORY_PARS)
 
         except ValueError as e:
             logging.error(e)
@@ -91,6 +91,7 @@ class Component(KBCEnvHandler):
         res_file_folder = os.path.join(self.tables_out_path, 'kafka_results')
 
         latest_offsets = dict()
+        msg_cnt = 0
         for msg in c.consume_message_batch(topics):
             if msg is None:
                 break
@@ -117,9 +118,10 @@ class Component(KBCEnvHandler):
 
             # Save data as a sliced table file in defined folder
             self.save_file(extracted_data, os.path.join(res_file_folder, filename))
+            msg_cnt += 1
 
             # will be changed
-            latest_offsets[msg.partition()] = msg.offset()
+            latest_offsets['p' + str(msg.partition())] = msg.offset()
 
         # Store previous offsets
         state_dict = {"prev_offsets": latest_offsets}
@@ -129,10 +131,14 @@ class Component(KBCEnvHandler):
         logging.info("Extraction finished.")
 
         # Produce final sliced table manifest
-        self.configuration.write_table_manifest(res_file_folder,
-                                                primary_key=RESULT_PK,
-                                                columns=RESULT_COLS,
-                                                incremental=True)
+        if msg_cnt > 0:
+            logging.info(F'Fetched {msg_cnt} messages.')
+            self.configuration.write_table_manifest(res_file_folder,
+                                                    primary_key=RESULT_PK,
+                                                    columns=RESULT_COLS,
+                                                    incremental=True)
+        else:
+            logging.info('No new messages found!')
 
     def save_file(self, line, filename):
         """
