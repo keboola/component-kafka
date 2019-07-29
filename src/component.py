@@ -50,7 +50,7 @@ class Component(KBCEnvHandler):
             logging.error(e)
             exit(1)
 
-    def run(self):
+    def run(self, debug=False):
         """
         Main execution code
 
@@ -84,7 +84,7 @@ class Component(KBCEnvHandler):
 
         # Setup
         c = Kbcconsumer(servers, "%s-consumer" % params.get(KBC_GROUP_ID), "test", params.get(KBC_USERNAME),
-                        params.get(KBC_PASSWORD), logging.getLogger(), start_offset=prev_offsets)
+                        params.get(KBC_PASSWORD), logging.getLogger(), start_offset=prev_offsets, debug=debug)
 
         logging.info("Extracting data from topics {0}".format(topics))
 
@@ -167,4 +167,4 @@ if __name__ == "__main__":
         debug = True
 
     comp = Component(debug)
-    comp.run()
+    comp.run(debug)

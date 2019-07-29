@@ -8,13 +8,15 @@ NEXT_MSG_TIMEOUT = 60
 
 class Kbcconsumer():
 
-    def __init__(self, servers, group_id, client_id, name, password, logger, start_offset=None, config_params=None):
+    def __init__(self, servers, group_id, client_id, name, password, logger, start_offset=None, config_params=None,
+                 debug=False):
 
         configuration = {
             "bootstrap.servers": servers,
             "group.id": group_id,
             "client.id": client_id,
             "session.timeout.ms": 6000,
+            "consumer.timeout.ms": 120000,
             "security.protocol": "SASL_SSL",
             "sasl.mechanisms": "SCRAM-SHA-256",
             "sasl.username": name,
@@ -23,6 +25,8 @@ class Kbcconsumer():
             "auto.offset.reset": "smallest",
             "enable.auto.commit": True
         }
+        if debug:
+            configuration['debug'] = 'fetch'
 
         if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")
