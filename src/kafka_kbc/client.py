@@ -36,7 +36,7 @@ class Kbcconsumer():
 
         self.start_offset = conv_offsets
         self.consumer = Consumer(**configuration)
-        print(self.consumer.assignment(servers))
+        logging.debug(self.consumer.assignment(servers))
 
     def _set_start_offsets(self, consumer, partitions):
         logging.debug(F'Setting starting offsets {self.start_offset} for partitions: {partitions}')
@@ -96,5 +96,5 @@ class Kbcconsumer():
             if boundaries[1] > 0:
                 # decrement to get max existing offset
                 offsets[p] = boundaries[1] - 1
-
+        logging.debug(F'Offset boundaries listed successfully. {offsets}')
         return offsets
