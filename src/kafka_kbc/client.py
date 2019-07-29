@@ -25,7 +25,7 @@ class Kbcconsumer():
             "enable.auto.commit": True
         }
         if debug:
-            configuration['debug'] = 'fetch'
+            configuration['debug'] = 'consumer'
 
         if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")
