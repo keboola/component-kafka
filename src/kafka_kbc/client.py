@@ -22,7 +22,8 @@ class Kbcconsumer():
             "sasl.password": password,
             # we are controlling offset ourselves, by default start from start
             "auto.offset.reset": "smallest",
-            "enable.auto.commit": True
+            "enable.auto.commit": True,
+            "logger": logger
         }
         if debug:
             configuration['debug'] = 'consumer'
