@@ -16,7 +16,6 @@ class Kbcconsumer():
             "group.id": group_id,
             "client.id": client_id,
             "session.timeout.ms": 6000,
-            "consumer.timeout.ms": 120000,
             "security.protocol": "SASL_SSL",
             "sasl.mechanisms": "SCRAM-SHA-256",
             "sasl.username": name,
@@ -91,7 +90,7 @@ class Kbcconsumer():
     def _get_max_offsets(self, topic):
         logging.debug('Getting offset boundaries for all partitions.')
         offsets = dict()
-        curr_topics = self.consumer.list_topics().topics
+        curr_topics = self.consumer.list_topics(timeout=60).topics
         if not curr_topics.get(topic):
             raise ValueError(F'The topic: "{topic}" does not exist. Available topics are: {curr_topics}')
         for p in curr_topics[topic].partitions:
