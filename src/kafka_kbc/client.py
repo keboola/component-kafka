@@ -26,7 +26,7 @@ class Kbcconsumer():
             "logger": logger
         }
         if debug:
-            configuration['debug'] = 'consumer'
+            configuration['debug'] = 'consumer, broker'
 
         if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")
