@@ -32,3 +32,20 @@ It is an object with attribute key marking the partition number prefixed by `p` 
 e.g. `{"p2": 0, "p1": 1, "p4": 0, "p0": 1, "p3": 3}`
 - **debug** - [OPT] Optional argument to enable debug mode with extensive logging. By default `false`
 
+### Example JSON
+
+```
+{
+  "servers": [
+    "xxx01.srvs.test.com:9094",
+    "xxxy-02.srvs.test.com:9094",
+    "xxx-03.srvs.test.com:9094"
+  ],
+  "group_id": "some_id1234",
+  "topic": "12345-default",
+  "username": "username",
+  "#password": "XXXX",
+  "debug": true
+}
+```
+
