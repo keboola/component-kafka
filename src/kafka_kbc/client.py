@@ -8,7 +8,7 @@ NEXT_MSG_TIMEOUT = 60
 
 class Kbcconsumer():
 
-    def __init__(self, servers, group_id, client_id, name, password, logger, start_offset=None, config_params=None,
+    def __init__(self, servers, group_id, client_id, logger, name=None, password=None, start_offset=None, config_params=None,
                  debug=False):
 
         configuration = {

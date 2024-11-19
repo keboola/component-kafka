@@ -8,7 +8,9 @@ import os
 import sys
 
 import csv
-from kbc.env_handler import KBCEnvHandler
+from keboola.component.base import ComponentBase
+from keboola.component.exceptions import UserException
+from configuration import Configuration
 
 from kafka_kbc.client import Kbcconsumer
 
@@ -17,38 +19,12 @@ RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key
 RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key',
                'value']
 
-# configuration variables
-KBC_SERVERS = "servers"
-KBC_GROUP_ID = "group_id"
-KBC_USERNAME = "username"
-KBC_PASSWORD = "#password"
-KBC_TOPIC = "topic"
-KBC_BEGIN_OFFSET = "begin_offsets"
-DEBUG = "debug"
 
-APP_VERSION = "0.0.1"
+class Component(ComponentBase):
 
-MANDATORY_PARS = [KBC_SERVERS, KBC_GROUP_ID, KBC_TOPIC, KBC_USERNAME, KBC_PASSWORD]
+    def __init__(self):
+        super().__init__()
 
-
-class Component(KBCEnvHandler):
-    def __init__(self, debug=False):
-
-        KBCEnvHandler.__init__(self, MANDATORY_PARS)
-        # override debug from config
-        if self.cfg_params.get('debug'):
-            debug = True
-
-        self.set_default_logger('DEBUG' if debug else 'INFO')
-        logging.info('Running version %s', APP_VERSION)
-        logging.info('Loading configuration...')
-
-        try:
-            self.validate_config(MANDATORY_PARS)
-
-        except ValueError as e:
-            logging.error(e)
-            exit(1)
 
     def run(self, debug=False):
         """
@@ -62,15 +38,15 @@ class Component(KBCEnvHandler):
          See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
-        params = self.cfg_params  # noqa
+        params = Configuration(**self.configuration.parameters)
 
         # Generating a string out of the list
-        servers = ",".join(params.get(KBC_SERVERS))
+        servers = ",".join(params.servers)
 
         # Get current state file for offset, 0 if empty
-        if params.get(KBC_BEGIN_OFFSET):
-            logging.info(F'Begin offset specified, overriding with {params.get(KBC_BEGIN_OFFSET)}')
-            prev_offsets = params.get(KBC_BEGIN_OFFSET)
+        if params.begin_offsets:
+            logging.info(F'Begin offset specified, overriding with {params.begin_offsets}')
+            prev_offsets = params.begin_offsets
         else:
             logging.info('Loading state file..')
             prev_offsets = self.get_state_file().get("prev_offsets", dict())
@@ -80,11 +56,11 @@ class Component(KBCEnvHandler):
         else:
             logging.info("Extracting data from previous offsets: {0}".format(prev_offsets))
 
-        topics = (params.get(KBC_TOPIC)).split(",")
+        topics = (params.topic).split(",")
 
         # Setup
-        c = Kbcconsumer(servers, "%s-consumer" % params.get(KBC_GROUP_ID), "test", params.get(KBC_USERNAME),
-                        params.get(KBC_PASSWORD), logging.getLogger(), start_offset=prev_offsets, debug=debug)
+        c = Kbcconsumer(servers, "%s-consumer" % params.group_id, "test", params.username,
+                        params.password, logging.getLogger(), start_offset=prev_offsets, debug=debug)
 
         logging.info("Extracting data from topics {0}".format(topics))
 
@@ -133,10 +109,10 @@ class Component(KBCEnvHandler):
         # Produce final sliced table manifest
         if msg_cnt > 0:
             logging.info(F'Fetched {msg_cnt} messages.')
-            self.configuration.write_table_manifest(res_file_folder,
-                                                    primary_key=RESULT_PK,
-                                                    columns=RESULT_COLS,
-                                                    incremental=True)
+            out_table=self.create_out_table_definition(res_file_folder, is_sliced=True,
+                                                       primary_key=RESULT_PK, columns=RESULT_COLS, incremental=True)
+
+            self.write_manifest(out_table)
         else:
             logging.info('No new messages found!')
 
@@ -149,7 +125,7 @@ class Component(KBCEnvHandler):
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         try:
-            with open(filename, 'w') as file:
+            with open(filename, 'a') as file:
                 writer = csv.DictWriter(file, fieldnames=RESULT_COLS)
                 writer.writerow(line)
             logging.info("File saved.")
@@ -157,14 +133,17 @@ class Component(KBCEnvHandler):
             logging.error("Could not save file! exit.", e)
 
 
+"""
+        Main entrypoint
+"""
 if __name__ == "__main__":
-    """
-    Main entrypoint
-    """
-    if len(sys.argv) > 1:
-        debug = sys.argv[1]
-    else:
-        debug = True
-
-    comp = Component(debug)
-    comp.run(debug)
+    try:
+        comp = Component()
+        # this triggers the run method by default and is controlled by the configuration.action parameter
+        comp.execute_action()
+    except UserException as exc:
+        logging.exception(exc)
+        exit(1)
+    except Exception as exc:
+        logging.exception(exc)
+        exit(2)

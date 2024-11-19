@@ -1,4 +1,5 @@
-https://bitbucket.org/kds_consulting_team/keboola-python-util-lib/get/0.2.4.zip#egg=kbc
+keboola.component==1.6.8
 mock
 freezegun
 confluent_kafka
+pydantic
