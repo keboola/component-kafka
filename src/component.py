@@ -5,7 +5,6 @@ Template Component main class.
 
 import logging
 import os
-import sys
 
 import csv
 from keboola.component.base import ComponentBase
@@ -24,7 +23,6 @@ class Component(ComponentBase):
 
     def __init__(self):
         super().__init__()
-
 
     def run(self, debug=False):
         """
@@ -121,8 +119,8 @@ class Component(ComponentBase):
         # Produce final sliced table manifest
         if msg_cnt > 0:
             logging.info(F'Fetched {msg_cnt} messages.')
-            out_table=self.create_out_table_definition(res_file_folder, is_sliced=True,
-                                                       primary_key=RESULT_PK, columns=RESULT_COLS, incremental=True)
+            out_table = self.create_out_table_definition(res_file_folder, is_sliced=True,
+                                                         primary_key=RESULT_PK, columns=RESULT_COLS, incremental=True)
 
             self.write_manifest(out_table)
         else:
