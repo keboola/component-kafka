@@ -1,7 +1,8 @@
 import logging
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, validator, field_validator
 from keboola.component.exceptions import UserException
 from enum import Enum
+import json
 
 
 class Units(str, Enum):
@@ -12,9 +13,20 @@ class Units(str, Enum):
 class Configuration(BaseModel):
     servers: list[str] = Field(default=None)
     group_id: str = Field(default=None)
-    username: str = Field(default=None)
-    password: str = Field(alias="#password")
     topic: str = Field(default=None)
+
+    security_protocol: str = Field(default=None)
+    sasl_mechanisms: str = Field(default=None)
+
+    username: str = Field(default=None)
+    password: str = Field(alias="#password", default=None)
+
+    ssl_ca: str = Field(default=None)
+    ssl_key: str = Field(default=None)
+    ssl_certificate: str = Field(default=None)
+
+    config_params: str = Field(default=None)
+
     begin_offsets: str = Field(default=None)
     debug: bool = False
 
@@ -27,3 +39,12 @@ class Configuration(BaseModel):
 
         if self.debug:
             logging.debug("Component will run in Debug mode")
+
+    @field_validator('config_params')
+    def parse_configuration(cls, value):
+        if isinstance(value, str):
+            try:
+                return json.loads(value.replace("'", '"'))
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON string for config_params: {e}")
+        return value

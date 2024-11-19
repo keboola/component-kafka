@@ -59,8 +59,20 @@ class Component(ComponentBase):
         topics = (params.topic).split(",")
 
         # Setup
-        c = Kbcconsumer(servers, "%s-consumer" % params.group_id, "test", params.username,
-                        params.password, logging.getLogger(), start_offset=prev_offsets, debug=debug)
+        c = Kbcconsumer(servers=servers,
+                        group_id="%s-consumer" % params.group_id,
+                        client_id="test",
+                        security_protocol=params.security_protocol,
+                        sasl_mechanisms=params.sasl_mechanisms,
+                        username=params.username,
+                        password=params.password,
+                        ssl_ca=params.ssl_ca,
+                        ssl_key=params.ssl_key,
+                        ssl_certificate=params.ssl_certificate,
+                        logger=logging.getLogger(),
+                        start_offset=prev_offsets,
+                        config_params=params.config_params,
+                        debug=debug)
 
         logging.info("Extracting data from topics {0}".format(topics))
 

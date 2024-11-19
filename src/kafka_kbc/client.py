@@ -1,4 +1,5 @@
 import logging
+import tempfile
 
 from confluent_kafka import Consumer, TopicPartition
 
@@ -8,7 +9,9 @@ NEXT_MSG_TIMEOUT = 60
 
 class Kbcconsumer():
 
-    def __init__(self, servers, group_id, client_id, logger, name=None, password=None, start_offset=None, config_params=None,
+    def __init__(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
+                 username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,
+                 start_offset=None, config_params=None,
                  debug=False):
 
         configuration = {
@@ -16,10 +19,13 @@ class Kbcconsumer():
             "group.id": group_id,
             "client.id": client_id,
             "session.timeout.ms": 6000,
-            "security.protocol": "SASL_SSL",
-            "sasl.mechanisms": "SCRAM-SHA-256",
-            "sasl.username": name,
+            "security.protocol": security_protocol,
+            "sasl.mechanisms": sasl_mechanisms,
+            "sasl.username": username,
             "sasl.password": password,
+            'ssl.ca.location': self._create_temp_file(ssl_ca),
+            'ssl.key.location': self._create_temp_file(ssl_key),
+            'ssl.certificate.location': self._create_temp_file(ssl_certificate),
             # we are controlling offset ourselves, by default start from start
             "auto.offset.reset": "smallest",
             "enable.auto.commit": True,
@@ -27,6 +33,12 @@ class Kbcconsumer():
         }
         if debug:
             configuration['debug'] = 'consumer, broker'
+
+        if config_params:
+            configuration.update(config_params)
+
+        # kafka config can't handle None or "" values
+        configuration = {key: value for key, value in configuration.items() if value is not None}
 
         if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")
@@ -41,6 +53,14 @@ class Kbcconsumer():
         self.start_offset = conv_offsets
         self.consumer = Consumer(**configuration)
         logging.debug(self.consumer.assignment(servers))
+
+    @staticmethod
+    def _create_temp_file(content, suffix=".pem"):
+        if content:
+            temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+            temp_file.write(content.encode())
+            temp_file.close()
+            return temp_file.name
 
     def _set_start_offsets(self, consumer, partitions):
         logging.debug(F'Setting starting offsets {self.start_offset} for partitions: {partitions}')
