@@ -5,13 +5,17 @@ Template Component main class.
 
 import logging
 import os
-
 import csv
+
 from keboola.component.base import ComponentBase
 from keboola.component.exceptions import UserException
 from configuration import Configuration
 
 from kafka_kbc.client import Kbcconsumer
+
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroDeserializer
+from confluent_kafka.serialization import SerializationContext, MessageField
 
 # global constants
 RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
@@ -69,10 +73,22 @@ class Component(ComponentBase):
                         ssl_certificate=params.ssl_certificate,
                         logger=logging.getLogger(),
                         start_offset=prev_offsets,
-                        config_params=params.config_params,
+                        config_params=params.kafka_extra_params,
                         debug=debug)
 
         logging.info("Extracting data from topics {0}".format(topics))
+
+        deserializer = None
+        if params.deserialize == 'avro':
+            if params.schema_registry_url:
+                config = params.schema_registry_extra_params
+                config['url'] = params.schema_registry_url
+                schema_registry_client = SchemaRegistryClient(config)
+                deserializer = AvroDeserializer(schema_registry_client)
+            elif params.schema_str:
+                deserializer = AvroDeserializer(params.schema_str)
+            else:
+                raise ValueError("Schema Registry URL or schema string must be provided for Avro deserialization.")
 
         res_file_folder = os.path.join(self.tables_out_path, 'kafka_results')
 
@@ -85,6 +101,11 @@ class Component(ComponentBase):
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
+            if params.deserialize == 'avro':
+                value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+            else:
+                value = msg.value().decode('utf-8')
+
             extracted_data = {
                 'topic': msg.topic(),
                 'timestamp_type': msg.timestamp()[0],
@@ -92,7 +113,7 @@ class Component(ComponentBase):
                 'partition': msg.partition(),
                 'offset': msg.offset(),
                 'key': msg.key(),
-                'value': msg.value().decode('utf-8')}
+                'value': value}
 
             filename = (("{0}-{1}-{2}.csv").format(
                 msg.topic(),

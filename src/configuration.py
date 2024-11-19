@@ -25,9 +25,15 @@ class Configuration(BaseModel):
     ssl_key: str = Field(default=None)
     ssl_certificate: str = Field(default=None)
 
-    config_params: str = Field(default=None)
-
     begin_offsets: str = Field(default=None)
+
+    kafka_extra_params: str = Field(default=None)
+
+    deserialize: str = Field(default=None)
+    schema_str: str = Field(default=None)
+    schema_registry_url: str = Field(default=None)
+    schema_registry_extra_params: str = Field(default=None)
+
     debug: bool = False
 
     def __init__(self, **data):
@@ -40,7 +46,7 @@ class Configuration(BaseModel):
         if self.debug:
             logging.debug("Component will run in Debug mode")
 
-    @field_validator('config_params')
+    @field_validator("kafka_extra_params", "schema_registry_extra_params")
     def parse_configuration(cls, value):
         if isinstance(value, str):
             try:
