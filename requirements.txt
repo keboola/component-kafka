@@ -4,3 +4,4 @@ freezegun
 confluent_kafka
 pydantic
 fastavro
+requests
