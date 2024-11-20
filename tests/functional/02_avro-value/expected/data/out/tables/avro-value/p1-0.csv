@@ -1,0 +1,8 @@
+avro-value,1,1732104020556,1,0,b'key1',1,avro-value-111,Test message 1
+avro-value,1,1732104020556,1,1,b'key2',2,avro-value-111,Test message 2
+avro-value,1,1732104020556,1,2,b'key1',5,avro-value-111,Test message 5
+avro-value,1,1732104020556,1,3,b'key2',6,avro-value-111,Test message 6
+avro-value,1,1732104020556,1,4,b'key1',9,avro-value-111,Test message 9
+avro-value,1,1732104020556,1,5,b'key2',10,avro-value-111,Test message 10
+avro-value,1,1732104020556,1,6,b'key1',13,avro-value-111,Test message 13
+avro-value,1,1732104020556,1,7,b'key2',14,avro-value-111,Test message 14

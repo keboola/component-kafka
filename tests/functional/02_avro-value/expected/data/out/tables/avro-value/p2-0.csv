@@ -1,0 +1,4 @@
+avro-value,1,1732104020556,2,0,b'key0',0,avro-value-111,Test message 0
+avro-value,1,1732104020556,2,1,b'key0',4,avro-value-111,Test message 4
+avro-value,1,1732104020556,2,2,b'key0',8,avro-value-111,Test message 8
+avro-value,1,1732104020556,2,3,b'key0',12,avro-value-111,Test message 12

@@ -29,13 +29,14 @@ class Configuration(BaseModel):
 
     kafka_extra_params: str = Field(default=None)
 
-    store_as_json: bool = True
     deserialize: str = Field(default=None)
+    flatten_message_value_columns: bool = True
     schema_str: str = Field(default=None)
     schema_registry_url: str = Field(default=None)
     schema_registry_extra_params: str = Field(default={})
 
     debug: bool = False
+    freeze_timestamp: bool = False
 
     def __init__(self, **data):
         try:

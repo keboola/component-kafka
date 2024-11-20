@@ -74,7 +74,7 @@ class Component(ComponentBase):
             if consumed['msg_cnt'] > 0:
                 logging.info(F'Fetched {consumed['msg_cnt']} messages from topic - {topic}')
                 out_table = self.create_out_table_definition(consumed['res_file_folder'], is_sliced=True,
-                                                             primary_key=RESULT_PK, columns=self.columns[topic],
+                                                             primary_key=RESULT_PK, schema=self.columns[topic],
                                                              incremental=True)
 
                 self.write_manifest(out_table)
@@ -110,23 +110,28 @@ class Component(ComponentBase):
             else:
                 value = msg.value().decode('utf-8')
 
+            if self.params.freeze_timestamp:
+                timestamp = 1732104020556
+            else:
+                timestamp = msg.timestamp()[1]
+
             extracted_data = {
                 'topic': msg.topic(),
                 'timestamp_type': msg.timestamp()[0],
-                'timestamp': msg.timestamp()[1],
+                'timestamp': timestamp,
                 'partition': msg.partition(),
                 'offset': msg.offset(),
                 'key': msg.key()}
 
-            if self.params.store_as_json:
-                extracted_data['value'] = value
-            else:
+            if self.params.flatten_message_value_columns:
                 self.safe_update(extracted_data, value)
                 self.columns[topic] = list(extracted_data.keys())
+            else:
+                extracted_data['value'] = value
 
-            filename = (("{0}-{1}.csv").format(
-                msg.timestamp()[0],
-                msg.timestamp()[1],
+            filename = (("p{0}-{1}.csv").format(
+                msg.partition(),
+                msg.offset() // 10_000,
             ))
 
             logging.debug(F'Received message: {extracted_data}')

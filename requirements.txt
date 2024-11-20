@@ -5,3 +5,4 @@ confluent_kafka
 pydantic
 fastavro
 requests
+https://bitbucket.org/kds_consulting_team/datadirtest/get/1.8.3.zip#egg=datadirtest
