@@ -10,7 +10,7 @@ services:
       - KBC_DATADIR=./data
   broker:
     image: apache/kafka:latest
-    container_name: kafka-broker
+    container_name: broker
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
