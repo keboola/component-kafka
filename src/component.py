@@ -7,11 +7,12 @@ import logging
 import os
 import csv
 
-from keboola.component.base import ComponentBase
+from keboola.component.base import ComponentBase, sync_action
+from keboola.component.sync_actions import SelectElement
 from keboola.component.exceptions import UserException
 from configuration import Configuration
 
-from kafka_kbc.client import Kbcconsumer
+from kafka.client import KafkaConsumer
 
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -26,6 +27,10 @@ RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'k
 class Component(ComponentBase):
 
     def __init__(self):
+        self.params = None
+        self.client = None
+        self.topics = dict()
+        self.latest_offsets = dict()
         super().__init__()
 
     def run(self, debug=False):
@@ -40,68 +45,62 @@ class Component(ComponentBase):
          See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
-        params = Configuration(**self.configuration.parameters)
+        self.params = Configuration(**self.configuration.parameters)
 
         # Generating a string out of the list
-        servers = ",".join(params.servers)
+        servers = ",".join(self.params.servers)
 
-        # Get current state file for offset, 0 if empty
-        if params.begin_offsets:
-            logging.info(F'Begin offset specified, overriding with {params.begin_offsets}')
-            prev_offsets = params.begin_offsets
-        else:
-            logging.info('Loading state file..')
-            prev_offsets = self.get_state_file().get("prev_offsets", dict())
+        self.latest_offsets = self.get_state_file().get("prev_offsets", dict())
 
-        if not prev_offsets:
-            logging.info("Extracting data from the beginning")
-        else:
-            logging.info("Extracting data from previous offsets: {0}".format(prev_offsets))
+        self.client = self._init_client(debug, self.params, self.latest_offsets, servers)
 
-        topics = (params.topic).split(",")
+        logging.info("Extracting data from topics {0}".format(self.params.topics))
 
-        # Setup
-        c = Kbcconsumer(servers=servers,
-                        group_id="%s-consumer" % params.group_id,
-                        client_id="test",
-                        security_protocol=params.security_protocol,
-                        sasl_mechanisms=params.sasl_mechanisms,
-                        username=params.username,
-                        password=params.password,
-                        ssl_ca=params.ssl_ca,
-                        ssl_key=params.ssl_key,
-                        ssl_certificate=params.ssl_certificate,
-                        logger=logging.getLogger(),
-                        start_offset=prev_offsets,
-                        config_params=params.kafka_extra_params,
-                        debug=debug)
+        for topic in self.params.topics:
+            msg_cnt, res_file_folder = self.consume_topic(topic)
+            self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder}
 
-        logging.info("Extracting data from topics {0}".format(topics))
+        # Store previous offsets
+        state_dict = {"prev_offsets": self.latest_offsets}
+        self.write_state_file(state_dict)
+        logging.info("Offset file stored.")
 
+        logging.info("Extraction finished.")
+
+        for topic, consumed in self.topics.items():
+            # Produce final sliced table manifest
+            if consumed['msg_cnt'] > 0:
+                logging.info(F'Fetched {consumed['msg_cnt']} messages from topic - {topic}')
+                out_table = self.create_out_table_definition(consumed['res_file_folder'], is_sliced=True,
+                                                             primary_key=RESULT_PK, columns=RESULT_COLS,
+                                                             incremental=True)
+
+                self.write_manifest(out_table)
+            else:
+                logging.info('No new messages found!')
+
+    def consume_topic(self, topic):
         deserializer = None
-        if params.deserialize == 'avro':
-            if params.schema_registry_url:
-                config = params.schema_registry_extra_params
-                config['url'] = params.schema_registry_url
+        if self.params.deserialize == 'avro':
+            if self.params.schema_registry_url:
+                config = self.params.schema_registry_extra_params
+                config['url'] = self.params.schema_registry_url
                 schema_registry_client = SchemaRegistryClient(config)
                 deserializer = AvroDeserializer(schema_registry_client)
-            elif params.schema_str:
-                deserializer = AvroDeserializer(params.schema_str)
+            elif self.params.schema_str:
+                deserializer = AvroDeserializer(self.params.schema_str)
             else:
                 raise ValueError("Schema Registry URL or schema string must be provided for Avro deserialization.")
-
-        res_file_folder = os.path.join(self.tables_out_path, 'kafka_results')
-
-        latest_offsets = dict()
+        res_file_folder = os.path.join(self.tables_out_path, topic)
         msg_cnt = 0
-        for msg in c.consume_message_batch(topics):
+        for msg in self.client.consume_message_batch(topic):
             if msg is None:
                 break
             if msg.error():
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            if params.deserialize == 'avro':
+            if self.params.deserialize == 'avro':
                 value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
             else:
                 value = msg.value().decode('utf-8')
@@ -115,8 +114,7 @@ class Component(ComponentBase):
                 'key': msg.key(),
                 'value': value}
 
-            filename = (("{0}-{1}-{2}.csv").format(
-                msg.topic(),
+            filename = (("{0}-{1}.csv").format(
                 msg.timestamp()[0],
                 msg.timestamp()[1],
             ))
@@ -127,25 +125,31 @@ class Component(ComponentBase):
             self.save_file(extracted_data, os.path.join(res_file_folder, filename))
             msg_cnt += 1
 
-            # will be changed
-            latest_offsets['p' + str(msg.partition())] = msg.offset()
+            print(msg.partition())
 
-        # Store previous offsets
-        state_dict = {"prev_offsets": latest_offsets}
-        self.write_state_file(state_dict)
-        logging.info("Offset file stored.")
+            if msg.topic() not in self.latest_offsets:
+                self.latest_offsets[msg.topic()] = {}
 
-        logging.info("Extraction finished.")
+            self.latest_offsets[msg.topic()]['p' + str(msg.partition())] = msg.offset()
 
-        # Produce final sliced table manifest
-        if msg_cnt > 0:
-            logging.info(F'Fetched {msg_cnt} messages.')
-            out_table = self.create_out_table_definition(res_file_folder, is_sliced=True,
-                                                         primary_key=RESULT_PK, columns=RESULT_COLS, incremental=True)
+        return msg_cnt, res_file_folder
 
-            self.write_manifest(out_table)
-        else:
-            logging.info('No new messages found!')
+    def _init_client(self, debug, params, prev_offsets, servers):
+        c = KafkaConsumer(servers=servers,
+                          group_id="%s-consumer" % params.group_id,
+                          client_id="test",
+                          security_protocol=params.security_protocol,
+                          sasl_mechanisms=params.sasl_mechanisms,
+                          username=params.username,
+                          password=params.password,
+                          ssl_ca=params.ssl_ca,
+                          ssl_key=params.ssl_key,
+                          ssl_certificate=params.ssl_certificate,
+                          logger=logging.getLogger(),
+                          start_offset=prev_offsets,
+                          config_params=params.kafka_extra_params,
+                          debug=debug)
+        return c
 
     def save_file(self, line, filename):
         """
@@ -162,6 +166,17 @@ class Component(ComponentBase):
             logging.info("File saved.")
         except Exception as e:
             logging.error("Could not save file! exit.", e)
+
+    @sync_action("list_topics")
+    def list_topics(self):
+        params = Configuration(**self.configuration.parameters)
+        servers = ",".join(params.servers)
+
+        c = self._init_client(False, params, dict(), servers)
+        topics = c.list_topics()
+        topics_names = [SelectElement(topics.get(t).topic) for t in topics]
+
+        return topics_names
 
 
 """

@@ -13,7 +13,7 @@ class Units(str, Enum):
 class Configuration(BaseModel):
     servers: list[str] = Field(default=None)
     group_id: str = Field(default=None)
-    topic: str = Field(default=None)
+    topics: list[str] = Field(default=None)
 
     security_protocol: str = Field(default=None)
     sasl_mechanisms: str = Field(default=None)
@@ -32,7 +32,7 @@ class Configuration(BaseModel):
     deserialize: str = Field(default=None)
     schema_str: str = Field(default=None)
     schema_registry_url: str = Field(default=None)
-    schema_registry_extra_params: str = Field(default=None)
+    schema_registry_extra_params: str = Field(default={})
 
     debug: bool = False
 

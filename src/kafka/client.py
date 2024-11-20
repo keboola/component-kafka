@@ -7,7 +7,7 @@ from confluent_kafka import Consumer, TopicPartition
 NEXT_MSG_TIMEOUT = 60
 
 
-class Kbcconsumer():
+class KafkaConsumer():
 
     def __init__(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
                  username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,
@@ -45,12 +45,7 @@ class Kbcconsumer():
         else:
             logging.info("Start offset specified, continue from previous state: {0}".format(start_offset))
 
-        # convert offset keys to proper format
-        conv_offsets = dict()
-        for off in start_offset:
-            conv_offsets[off.replace('p', '')] = start_offset[off]
-
-        self.start_offset = conv_offsets
+        self.start_offsets = start_offset
         self.consumer = Consumer(**configuration)
         logging.debug(self.consumer.assignment(servers))
 
@@ -63,24 +58,27 @@ class Kbcconsumer():
             return temp_file.name
 
     def _set_start_offsets(self, consumer, partitions):
-        logging.debug(F'Setting starting offsets {self.start_offset} for partitions: {partitions}')
-        if self.start_offset:
+        topic = partitions[0].topic
+
+        if self.start_offsets.get(topic):
+            logging.info(f"Extracting data from previous offsets: {self.start_offsets.get(topic)} - topic: {topic}")
             for p in partitions:
-                p.offset = self.start_offset.get(str(p.partition), 0)
+                p.offset = self.start_offsets.get(topic).get(f"p{p.partition}", -1) + 1
         else:
+            logging.info("Extracting data from the beginning")
             for p in partitions:
                 p.offset = 0
 
         consumer.assign(partitions)
 
-    def consume_message_batch(self, topics):
+    def consume_message_batch(self, topic):
 
-        self.consumer.subscribe(topics, on_assign=self._set_start_offsets)
+        self.consumer.subscribe([topic], on_assign=self._set_start_offsets)
 
         # get highest offset for current topic
-        max_offsets = self._get_max_offsets(topics[0])
+        max_offsets = self._get_max_offsets(topic)
 
-        logging.info(F"Subscribed to the topic {topics}")
+        logging.info(F"Subscribed to the topic {topic}")
         # Data extraction
         do_poll = True
         # poll until timeout is reached or the max offset is received
@@ -122,3 +120,6 @@ class Kbcconsumer():
                 offsets[p] = boundaries[1] - 1
         logging.debug(F'Offset boundaries listed successfully. {offsets}')
         return offsets
+
+    def list_topics(self):
+        return self.consumer.list_topics(timeout=60).topics
