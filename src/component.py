@@ -30,6 +30,7 @@ class Component(ComponentBase):
         self.params = None
         self.client = None
         self.topics = dict()
+        self.columns = dict()
         self.latest_offsets = dict()
         super().__init__()
 
@@ -50,6 +51,7 @@ class Component(ComponentBase):
         # Generating a string out of the list
         servers = ",".join(self.params.servers)
 
+        self.columns = self.get_state_file().get("columns", dict())
         self.latest_offsets = self.get_state_file().get("prev_offsets", dict())
 
         self.client = self._init_client(debug, self.params, self.latest_offsets, servers)
@@ -60,8 +62,8 @@ class Component(ComponentBase):
             msg_cnt, res_file_folder = self.consume_topic(topic)
             self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder}
 
-        # Store previous offsets
-        state_dict = {"prev_offsets": self.latest_offsets}
+        # Store previous offsets and columns
+        state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
         self.write_state_file(state_dict)
         logging.info("Offset file stored.")
 
@@ -72,7 +74,7 @@ class Component(ComponentBase):
             if consumed['msg_cnt'] > 0:
                 logging.info(F'Fetched {consumed['msg_cnt']} messages from topic - {topic}')
                 out_table = self.create_out_table_definition(consumed['res_file_folder'], is_sliced=True,
-                                                             primary_key=RESULT_PK, columns=RESULT_COLS,
+                                                             primary_key=RESULT_PK, columns=self.columns[topic],
                                                              incremental=True)
 
                 self.write_manifest(out_table)
@@ -80,6 +82,9 @@ class Component(ComponentBase):
                 logging.info('No new messages found!')
 
     def consume_topic(self, topic):
+
+        self.columns.setdefault(topic, RESULT_COLS)
+
         deserializer = None
         if self.params.deserialize == 'avro':
             if self.params.schema_registry_url:
@@ -111,8 +116,13 @@ class Component(ComponentBase):
                 'timestamp': msg.timestamp()[1],
                 'partition': msg.partition(),
                 'offset': msg.offset(),
-                'key': msg.key(),
-                'value': value}
+                'key': msg.key()}
+
+            if self.params.store_as_json:
+                extracted_data['value'] = value
+            else:
+                self.safe_update(extracted_data, value)
+                self.columns[topic] = list(extracted_data.keys())
 
             filename = (("{0}-{1}.csv").format(
                 msg.timestamp()[0],
@@ -122,7 +132,7 @@ class Component(ComponentBase):
             logging.debug(F'Received message: {extracted_data}')
 
             # Save data as a sliced table file in defined folder
-            self.save_file(extracted_data, os.path.join(res_file_folder, filename))
+            self.save_file(extracted_data, os.path.join(res_file_folder, filename), topic)
             msg_cnt += 1
 
             print(msg.partition())
@@ -151,7 +161,14 @@ class Component(ComponentBase):
                           debug=debug)
         return c
 
-    def save_file(self, line, filename):
+    def safe_update(self, extracted_data, value):
+        for key, val in value.items():
+            if key in extracted_data:
+                extracted_data[f"value_{key}"] = val
+            else:
+                extracted_data[key] = val
+
+    def save_file(self, line, filename, topic):
         """
         Save text as file
         """
@@ -161,7 +178,7 @@ class Component(ComponentBase):
             os.makedirs(os.path.dirname(filename))
         try:
             with open(filename, 'a') as file:
-                writer = csv.DictWriter(file, fieldnames=RESULT_COLS)
+                writer = csv.DictWriter(file, fieldnames=self.columns[topic])
                 writer.writerow(line)
             logging.info("File saved.")
         except Exception as e:
