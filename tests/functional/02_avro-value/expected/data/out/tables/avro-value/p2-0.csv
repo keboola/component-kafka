@@ -1,4 +1,0 @@
-avro-value,1,1732104020556,2,0,b'key0',"{'id': 0, 'key': 'avro-value-111', 'text': 'Test message 0'}"
-avro-value,1,1732104020556,2,1,b'key0',"{'id': 4, 'key': 'avro-value-111', 'text': 'Test message 4'}"
-avro-value,1,1732104020556,2,2,b'key0',"{'id': 8, 'key': 'avro-value-111', 'text': 'Test message 8'}"
-avro-value,1,1732104020556,2,3,b'key0',"{'id': 12, 'key': 'avro-value-111', 'text': 'Test message 12'}"
