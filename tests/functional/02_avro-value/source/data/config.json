@@ -16,7 +16,7 @@
     "security_protocol": "PLAINTEXT",
     "topics": ["avro-value"],
     "deserialize": "avro",
-    "flatten_message_value_columns": true,
+    "flatten_message_value_columns": false,
     "schema_registry_url": "http://schema-registry:8081",
     "debug": true,
     "freeze_timestamp": true
