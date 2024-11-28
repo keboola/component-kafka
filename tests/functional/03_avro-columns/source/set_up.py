@@ -32,16 +32,21 @@ def run(context: TestDataDir):
                   "type": "record",
                   "name": "User",
                   "fields": [
-                    {"name": "id", "type": "int"},
-                    {"name": "key", "type": "string"},
-                    {"name": "text", "type": "string"}
+                    {"name": "col_boolean", "type": "boolean"},
+                    {"name": "col_int", "type": "int"},
+                    {"name": "col_long", "type": "long"},
+                    {"name": "col_float", "type": "float"},
+                    {"name": "col_double", "type": "double"},
+                    {"name": "col_bytes", "type": "bytes"},
+                    {"name": "col_string", "type": "string"}
                   ]
                 }'''
 
         avro_serializer = AvroSerializer(schema_reg_client, schema_str)
 
         value = avro_serializer(
-            {"id": i, "key": f"{name}-111", "text": f"Test message {i}"},
+            {"col_boolean": True, "col_int": i, "col_long": 1234567890, "col_float": 123.45,
+             "col_double": 123456.7891234568, "col_bytes": b"test", "col_string": "Test message"},
             SerializationContext(name, MessageField.VALUE)
         )
 

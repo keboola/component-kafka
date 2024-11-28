@@ -6,10 +6,14 @@ Template Component main class.
 import logging
 import os
 import csv
+import json
+from collections import OrderedDict
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.sync_actions import SelectElement
 from keboola.component.exceptions import UserException
+from keboola.component.dao import ColumnDefinition, BaseType
+
 from configuration import Configuration
 
 from kafka.client import KafkaConsumer
@@ -20,8 +24,8 @@ from confluent_kafka.serialization import SerializationContext, MessageField
 
 # global constants
 RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
-RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key',
-               'value']
+RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key', 'value']
+RESULT_COLS_DTYPES = ['string', 'string', 'timestamp', 'int', 'int', 'string', 'string']
 
 
 class Component(ComponentBase):
@@ -59,22 +63,35 @@ class Component(ComponentBase):
         logging.info("Extracting data from topics {0}".format(self.params.topics))
 
         for topic in self.params.topics:
-            msg_cnt, res_file_folder = self.consume_topic(topic)
-            self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder}
+            msg_cnt, res_file_folder, schema = self.consume_topic(topic)
+            self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder, 'schema': schema}
 
         # Store previous offsets and columns
         state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
         self.write_state_file(state_dict)
         logging.info("Offset file stored.")
 
+        self.produce_manifest()
         logging.info("Extraction finished.")
 
+    def produce_manifest(self):
         for topic, consumed in self.topics.items():
+
+            schema = OrderedDict()
+            for col, dtype in zip(RESULT_COLS, RESULT_COLS_DTYPES):
+                schema[col] = ColumnDefinition(data_types=self.convert_dtypes(dtype))
+
+            if consumed.get('schema'):
+                del schema['value']
+
+            for col in consumed.get('schema'):
+                schema[col.get('name')] = ColumnDefinition(data_types=self.convert_dtypes(col.get('type')))
+
             # Produce final sliced table manifest
             if consumed['msg_cnt'] > 0:
                 logging.info(F'Fetched {consumed['msg_cnt']} messages from topic - {topic}')
                 out_table = self.create_out_table_definition(consumed['res_file_folder'], is_sliced=True,
-                                                             primary_key=RESULT_PK, schema=self.columns[topic],
+                                                             primary_key=RESULT_PK, schema=schema,
                                                              incremental=True)
 
                 self.write_manifest(out_table)
@@ -85,19 +102,12 @@ class Component(ComponentBase):
 
         self.columns.setdefault(topic, RESULT_COLS)
 
-        deserializer = None
-        if self.params.deserialize == 'avro':
-            if self.params.schema_registry_url:
-                config = self.params.schema_registry_extra_params
-                config['url'] = self.params.schema_registry_url
-                schema_registry_client = SchemaRegistryClient(config)
-                deserializer = AvroDeserializer(schema_registry_client)
-            elif self.params.schema_str:
-                deserializer = AvroDeserializer(self.params.schema_str)
-            else:
-                raise ValueError("Schema Registry URL or schema string must be provided for Avro deserialization.")
+        deserializer = self.get_deserializer()
+
         res_file_folder = os.path.join(self.tables_out_path, topic)
         msg_cnt = 0
+        last_message = None
+        dtypes = []
         for msg in self.client.consume_message_batch(topic):
             if msg is None:
                 break
@@ -126,6 +136,7 @@ class Component(ComponentBase):
             if self.params.flatten_message_value_columns:
                 self.safe_update(extracted_data, value)
                 self.columns[topic] = list(extracted_data.keys())
+                last_message = msg.value() # to get dtypes
             else:
                 extracted_data['value'] = value
 
@@ -147,7 +158,54 @@ class Component(ComponentBase):
 
             self.latest_offsets[msg.topic()]['p' + str(msg.partition())] = msg.offset()
 
-        return msg_cnt, res_file_folder
+        if self.params.deserialize == 'avro' and self.params.flatten_message_value_columns:
+            dtypes = self.get_topic_dtypes(last_message)
+
+        return msg_cnt, res_file_folder, dtypes
+
+    def get_deserializer(self):
+        deserializer = None
+        if self.params.deserialize == 'avro':
+            if self.params.schema_registry_url:
+                config = self.params.schema_registry_extra_params
+                config['url'] = self.params.schema_registry_url
+                schema_registry_client = SchemaRegistryClient(config)
+                deserializer = AvroDeserializer(schema_registry_client)
+            elif self.params.schema_str:
+                deserializer = AvroDeserializer(self.params.schema_str)
+            else:
+                raise ValueError("Schema Registry URL or schema string must be provided for Avro deserialization.")
+        return deserializer
+
+    def get_topic_dtypes(self, message_value: str):
+        schema = None
+        if self.params.deserialize == 'avro':
+            if self.params.schema_registry_url:
+                config = self.params.schema_registry_extra_params
+                config['url'] = self.params.schema_registry_url
+                schema_registry_client = SchemaRegistryClient(config)
+                schema_id = int.from_bytes(message_value[1:5])
+                schema = json.loads(schema_registry_client.get_schema(schema_id).schema_str).get('fields')
+
+            elif self.params.schema_str:
+                schema = json.loads(self.params.schema_str).get('fields')
+
+        return schema
+
+    def convert_dtypes(self, dtype: str = 'string'):
+        match dtype:
+            case 'boolean':
+                base_type = BaseType.boolean()
+            case 'int':
+                base_type = BaseType.integer()
+            case 'float':
+                base_type = BaseType.float()
+            case 'double':
+                base_type = BaseType.float()
+            case _:
+                base_type = BaseType.string()
+
+        return base_type
 
     def _init_client(self, debug, params, prev_offsets, servers):
         c = KafkaConsumer(servers=servers,
