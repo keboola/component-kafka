@@ -5,6 +5,7 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import SerializationContext, MessageField
 from confluent_kafka.admin import AdminClient
+import time
 
 def run(context: TestDataDir):
     admin_client = AdminClient({
@@ -48,3 +49,5 @@ def run(context: TestDataDir):
         producer.poll(0)
         producer.produce(topic=name, value=value, key=f"key{str(i % 4)}")  # key to distribute messages to partitions
         producer.flush()
+
+        time.sleep(3)
