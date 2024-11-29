@@ -12,6 +12,9 @@ class Units(str, Enum):
 
 class Configuration(BaseModel):
     servers: list[str] = Field(default=None)
+    group_id: str = Field(default=None)
+    client_id: str = Field(default=None)
+
     topics: list[str] = Field(default=None)
 
     security_protocol: str = Field(default=None)

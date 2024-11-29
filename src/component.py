@@ -52,8 +52,8 @@ class Component(ComponentBase):
 
         self.params = Configuration(**self.configuration.parameters)
 
-        self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}"
-        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}"
+        self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}" or "kbc-proj-0"
+        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
 
         # Generating a string out of the list
         servers = ",".join(self.params.servers)
