@@ -5,8 +5,12 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import SerializationContext, MessageField
 from confluent_kafka.admin import AdminClient
+import os
 
 def run(context: TestDataDir):
+    os.environ['KBC_PROJECTID'] = '00001'
+    os.environ['KBC_CONFIGROWID'] = '00001'
+
     admin_client = AdminClient({
         'bootstrap.servers': 'broker:9092',
         'security.protocol': 'PLAINTEXT'})
