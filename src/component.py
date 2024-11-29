@@ -52,6 +52,9 @@ class Component(ComponentBase):
 
         self.params = Configuration(**self.configuration.parameters)
 
+        self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}"
+        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}"
+
         # Generating a string out of the list
         servers = ",".join(self.params.servers)
 
@@ -209,8 +212,8 @@ class Component(ComponentBase):
 
     def _init_client(self, debug, params, prev_offsets, servers):
         c = KafkaConsumer(servers=servers,
-                          group_id="%s-consumer" % params.group_id,
-                          client_id="test",
+                          group_id=params.group_id,
+                          client_id=params.client_id,
                           security_protocol=params.security_protocol,
                           sasl_mechanisms=params.sasl_mechanisms,
                           username=params.username,
