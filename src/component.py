@@ -51,6 +51,7 @@ class Component(ComponentBase):
         """
 
         self.params = Configuration(**self.configuration.parameters)
+        self._validate_stack_params()
 
         self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}" or "kbc-proj-0"
         self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
@@ -76,6 +77,15 @@ class Component(ComponentBase):
 
         self.produce_manifest()
         logging.info("Extraction finished.")
+
+    def _validate_stack_params(self):
+        image_parameters = self.configuration.image_parameters or {}
+        allowed_hosts = [f"{host.get('host')}:{host.get('port')}" for host in image_parameters.get('allowed_hosts', [])]
+
+        if allowed_hosts:
+            for item in self.params.servers:
+                if item not in allowed_hosts:
+                    raise UserException(f"Host {item} is not allowed")
 
     def produce_manifest(self):
         for topic, consumed in self.topics.items():
