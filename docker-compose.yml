@@ -9,7 +9,7 @@ services:
     environment:
       - KBC_DATADIR=./data
   broker:
-    image: apache/kafka:3.9.0
+    image: apache/kafka:3.8.1
     container_name: broker
     environment:
       KAFKA_NODE_ID: 1
