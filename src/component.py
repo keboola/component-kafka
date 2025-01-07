@@ -52,7 +52,7 @@ class Component(ComponentBase):
 
         project_id = self.environment_variables.project_id
         if project_id:
-            logging.info("topics: {0}".format(self.params.topics))
+            logging.info("topics: {0}".format(self.list_topics()))
 
         self.params = Configuration(**self.configuration.parameters)
         self._validate_stack_params()
