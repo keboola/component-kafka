@@ -32,7 +32,7 @@ class KafkaConsumer():
             "logger": logger
         }
         if debug:
-            configuration['debug'] = 'consumer, broker'
+            configuration['debug'] = 'all'
 
         if config_params:
             configuration.update(config_params)
