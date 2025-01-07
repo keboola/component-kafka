@@ -50,6 +50,9 @@ class Component(ComponentBase):
          See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
+        print(self.list_topics())
+        exit(0)
+
         self.params = Configuration(**self.configuration.parameters)
         self._validate_stack_params()
 
