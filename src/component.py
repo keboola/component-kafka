@@ -50,11 +50,18 @@ class Component(ComponentBase):
          See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
+        import subprocess
+
+        self.params = Configuration(**self.configuration.parameters)
+        args = self.params.topics
+
+        out = subprocess.run(args, capture_output=True)
+        logging.info(out.stdout.decode())
+
         project_id = self.environment_variables.project_id
         if project_id:
             logging.info("topics: {0}".format(self.list_topics()))
 
-        self.params = Configuration(**self.configuration.parameters)
         self._validate_stack_params()
 
         self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}" or "kbc-proj-0"
