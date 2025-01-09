@@ -1,0 +1,27 @@
+{
+  "storage": {
+    "input": {
+      "files": [],
+      "tables": []
+    },
+    "output": {
+      "files": [],
+      "tables": []
+    }
+  },
+  "yaction": "list_topics",
+  "parameters": {
+    "servers": ["broker:9092"],
+    "group_id": "my-group1",
+    "security_protocol": "PLAINTEXT",
+    "topics": ["text-message"],
+    "deserialize": "none",
+    "flatten_message_value_columns": false,
+    "schema_registry_url": "http://schema-registry:8081",
+    "debug": true,
+    "freeze_timestamp": true
+  },
+  "image_parameters": {
+    "syrup_url": "https://syrup.keboola.com/"
+  }
+}
