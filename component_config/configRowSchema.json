@@ -15,7 +15,7 @@
       "options": {
         "tags": true,
         "async": {
-          "label": "Re-load topics",
+          "label": "Load topics",
           "action": "list_topics"
         }
       },
