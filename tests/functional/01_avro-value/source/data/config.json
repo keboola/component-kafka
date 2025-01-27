@@ -9,7 +9,7 @@
       "tables": []
     }
   },
-  "yaction": "list_topics",
+  "action": "message_preview",
   "parameters": {
     "servers": ["broker:9092"],
     "group_id": "my-group2",

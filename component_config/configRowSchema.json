@@ -88,13 +88,24 @@
     "schema_registry_extra_params": {
       "type": "string",
       "title": "Additional Schema Registry parameters",
-        "description": "Dictionary of additional <a href='https://docs.confluent.io/platform/current/schema-registry/installation/config.html'>Schema Registry parameters</a> in the format {\"exporter.retries.wait.ms\": 2000, \"exporter.max.retries\n\": 5\n} ",
+      "description": "Dictionary of additional <a href='https://docs.confluent.io/platform/current/schema-registry/installation/config.html'>Schema Registry parameters</a> in the format {\"exporter.retries.wait.ms\": 2000, \"exporter.max.retries\n\": 5\n} ",
       "options": {
         "dependencies": {
           "schema_source": "schema_registry"
         }
       },
       "propertyOrder": 7
+    },
+    "table_preview": {
+      "type": "button",
+      "format": "sync-action",
+      "options": {
+        "async": {
+          "label": "Message preview",
+          "action": "message_preview"
+        }
+      },
+      "propertyOrder": 8
     }
   }
 }

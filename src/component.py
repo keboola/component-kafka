@@ -8,9 +8,10 @@ import os
 import csv
 import json
 from collections import OrderedDict
+import polars
 
 from keboola.component.base import ComponentBase, sync_action
-from keboola.component.sync_actions import SelectElement
+from keboola.component.sync_actions import SelectElement, ValidationResult, MessageType
 from keboola.component.exceptions import UserException
 from keboola.component.dao import ColumnDefinition, BaseType
 
@@ -128,30 +129,7 @@ class Component(ComponentBase):
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            if self.params.deserialize == 'avro':
-                value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
-            else:
-                value = msg.value().decode('utf-8')
-
-            if self.params.freeze_timestamp:
-                timestamp = 1732104020556
-            else:
-                timestamp = msg.timestamp()[1]
-
-            extracted_data = {
-                'topic': msg.topic(),
-                'timestamp_type': msg.timestamp()[0],
-                'timestamp': timestamp,
-                'partition': msg.partition(),
-                'offset': msg.offset(),
-                'key': msg.key()}
-
-            if self.params.flatten_message_value_columns:
-                self.safe_update(extracted_data, value)
-                self.columns[topic] = list(extracted_data.keys())
-                last_message = msg.value() # to get dtypes
-            else:
-                extracted_data['value'] = value
+            extracted_data, last_message = self.get_message_data(deserializer, last_message, msg, topic)
 
             filename = (("p{0}-{1}.csv").format(
                 msg.partition(),
@@ -175,6 +153,30 @@ class Component(ComponentBase):
             dtypes = self.get_topic_dtypes(last_message)
 
         return msg_cnt, res_file_folder, dtypes
+
+    def get_message_data(self, deserializer, last_message, msg, topic):
+        if self.params.deserialize == 'avro':
+            value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+        else:
+            value = msg.value().decode('utf-8')
+        if self.params.freeze_timestamp:  # freeze for datadir tests
+            timestamp = 1732104020556
+        else:
+            timestamp = msg.timestamp()[1]
+        extracted_data = {
+            'topic': msg.topic(),
+            'timestamp_type': msg.timestamp()[0],
+            'timestamp': timestamp,
+            'partition': msg.partition(),
+            'offset': msg.offset(),
+            'key': msg.key()}
+        if self.params.flatten_message_value_columns:
+            self.safe_update(extracted_data, value)
+            self.columns[topic] = list(extracted_data.keys())
+            last_message = msg.value()  # to get dtypes
+        else:
+            extracted_data['value'] = value
+        return extracted_data, last_message
 
     def get_deserializer(self):
         deserializer = None
@@ -270,6 +272,32 @@ class Component(ComponentBase):
         topics_names = [SelectElement(topics.get(t).topic) for t in topics]
 
         return topics_names
+
+    @sync_action("message_preview")
+    def message_preview(self):
+        self.params = Configuration(**self.configuration.parameters)
+        servers = ",".join(self.params.servers)
+
+        c = self._init_client(False, self.params, dict(), servers)
+        deserializer = self.get_deserializer()
+        last_message = None
+        topic = self.params.topics[0]
+        for msg in c.consume_message_batch(topic):
+            if msg is None:
+                break
+            if msg.error():
+                logging.error("Consumer error: {}".format(msg.error()))
+                continue
+
+            extracted_data, _ = self.get_message_data(deserializer, last_message, msg, topic)
+
+            polars.Config.set_tbl_formatting("ASCII_MARKDOWN")
+            polars.Config.set_tbl_hide_dataframe_shape(True)
+            df = polars.DataFrame(extracted_data.get('value'))
+            md_table_output = str(df)
+
+            return ValidationResult(md_table_output, MessageType.SUCCESS)
+
 
 
 """
