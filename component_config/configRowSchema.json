@@ -1,0 +1,111 @@
+{
+  "type": "object",
+  "title": "Parameters",
+  "required": [
+  ],
+  "properties": {
+    "topics": {
+      "type": "array",
+      "items": {
+        "enum": [],
+        "type": "string"
+      },
+      "title": "Topics to subscribe",
+      "format": "select",
+      "options": {
+        "tags": true,
+        "async": {
+          "label": "Load topics",
+          "action": "list_topics"
+        }
+      },
+      "uniqueItems": true,
+      "propertyOrder": 1
+    },
+    "deserialize": {
+      "enum": [
+        "no",
+        "avro"
+      ],
+      "type": "string",
+      "title": "Deserialize message value",
+      "options": {
+        "enum_titles": [
+          "No",
+          "Avro"
+        ]
+      },
+      "propertyOrder": 2
+    },
+    "flatten_message_value_columns": {
+      "type": "boolean",
+      "title": "Flatten message value",
+      "format": "checkbox",
+      "description": "Store message value columns to table columns",
+      "propertyOrder": 3,
+      "options": {
+        "dependencies": {
+          "deserialize": "avro"
+        }
+      }
+    },
+    "schema_source": {
+      "enum": [
+        "user_defined",
+        "schema_registry"
+      ],
+      "type": "string",
+      "title": "Deserialize message value",
+      "options": {
+        "enum_titles": [
+          "User defined",
+          "From schema registry"
+        ]
+      },
+      "propertyOrder": 4
+    },
+    "schema_str": {
+      "type": "string",
+      "title": "Avro schema string",
+      "options": {
+        "dependencies": {
+          "schema_source": "user_defined"
+        }
+      },
+      "propertyOrder": 5
+    },
+    "schema_registry_url": {
+      "type": "string",
+      "title": "Schema registry URL",
+      "description": "Schema registry URL including protocol and port (e.g. http://schema-registry:8081)",
+      "options": {
+        "dependencies": {
+          "schema_source": "schema_registry"
+        }
+      },
+      "propertyOrder": 6
+    },
+    "schema_registry_extra_params": {
+      "type": "string",
+      "title": "Additional Schema Registry parameters",
+      "description": "Dictionary of additional <a href='https://docs.confluent.io/platform/current/schema-registry/installation/config.html'>Schema Registry parameters</a> in the format {\"exporter.retries.wait.ms\": 2000, \"exporter.max.retries\n\": 5\n} ",
+      "options": {
+        "dependencies": {
+          "schema_source": "schema_registry"
+        }
+      },
+      "propertyOrder": 7
+    },
+    "table_preview": {
+      "type": "button",
+      "format": "sync-action",
+      "options": {
+        "async": {
+          "label": "Message preview",
+          "action": "message_preview"
+        }
+      },
+      "propertyOrder": 8
+    }
+  }
+}
