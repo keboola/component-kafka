@@ -7,7 +7,7 @@ from confluent_kafka import Consumer, TopicPartition
 NEXT_MSG_TIMEOUT = 60
 
 
-class KafkaConsumer():
+class KafkaClient():
 
     def __init__(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
                  username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,

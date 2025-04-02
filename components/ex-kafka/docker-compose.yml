@@ -1,13 +1,15 @@
-version: "3"
 services:
   # for development purposes
   dev:
-    build: .
+    build:
+      context: ../../
+      dockerfile: components/ex-kafka/Dockerfile
     volumes:
         - ./:/code
         - ./data:/data
+        - ../common/src:/code/common/src
     environment:
-      - KBC_DATADIR=./data
+      - KBC_DATADIR=/data
   broker:
     image: apache/kafka:3.8.1
     container_name: broker
@@ -46,13 +48,16 @@ services:
       SCHEMA_REGISTRY_DEBUG: 'true'
   test:
     # Use to run flake8 and unittests checks
-    build: .
+    build:
+      context: ../../
+      dockerfile: components/ex-kafka/Dockerfile
     depends_on:
       schema-registry:
         condition: service_healthy
     volumes:
       - ./:/code
       - ./data:/data
+      - ../common/src:/code/common/src
     environment:
       - KBC_DATADIR=./data
     command:

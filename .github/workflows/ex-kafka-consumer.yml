@@ -1,0 +1,32 @@
+# This workflow is used to build and deploy the ex-kafka-consumer component
+name: ex-kafka-consumer
+
+on:
+  push:
+    branches:
+     - 'feature/*'
+     - 'fix/*'
+     - '*' 
+    tags:
+      - '*' # Skip the workflow on the main branch without tag
+    paths:
+      - 'components/ex-kafka/**'
+      - '../../components/common'
+      - '.github/workflows/**'
+
+concurrency: ci-${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/common-component-workflow.yml
+    with:
+      component_dir: ./components/ex-kafka
+      kbc_developerportal_app: keboola.ex-kafka
+      kbc_developerportal_vendor: keboola
+      kbc_test_project_configs: ""
+    secrets:
+      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      KBC_DEVELOPERPORTAL_USERNAME: ${{ vars.KBC_DEVELOPERPORTAL_USERNAME }}
+      KBC_DEVELOPERPORTAL_PASSWORD: ${{ secrets.KBC_DEVELOPERPORTAL_PASSWORD }}
+      KBC_STORAGE_TOKEN: ${{ secrets.KBC_STORAGE_TOKEN }} 

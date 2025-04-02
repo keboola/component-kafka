@@ -1,0 +1,1 @@
+from common.src.kafka_client import KafkaClient  # noqa F401
