@@ -131,7 +131,7 @@ jobs:
           docker image ls -a
 
           echo "Running unit-tests..."
-          docker compose up test
+          docker compose up test --exit-code-from test
           
 
       - name: Load Image
