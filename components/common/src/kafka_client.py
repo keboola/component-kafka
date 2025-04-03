@@ -7,38 +7,49 @@ from confluent_kafka import Consumer, TopicPartition
 NEXT_MSG_TIMEOUT = 60
 
 
-class KafkaClient():
+def build_configuration(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
+                        username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,
+                        start_offset=None, config_params=None,
+                        debug=False):
+
+    configuration = {
+        "bootstrap.servers": servers,
+        "group.id": group_id,
+        "client.id": client_id,
+        "session.timeout.ms": 6000,
+        "security.protocol": security_protocol,
+        "sasl.mechanisms": sasl_mechanisms,
+        "sasl.username": username,
+        "sasl.password": password,
+        'ssl.ca.location': self._create_temp_file(ssl_ca),
+        'ssl.key.location': self._create_temp_file(ssl_key),
+        'ssl.certificate.location': self._create_temp_file(ssl_certificate),
+        # we are controlling offset ourselves, by default start from start
+        "auto.offset.reset": "smallest",
+        "enable.auto.commit": True,
+        "logger": logger
+    }
+    if debug:
+        configuration['debug'] = 'consumer, broker'
+
+    if config_params:
+        configuration.update(config_params)
+
+    # kafka config can't handle None or "" values
+    return {key: value for key, value in configuration.items() if value is not None}
+
+
+class KafkaConsumer():
 
     def __init__(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
                  username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,
                  start_offset=None, config_params=None,
                  debug=False):
 
-        configuration = {
-            "bootstrap.servers": servers,
-            "group.id": group_id,
-            "client.id": client_id,
-            "session.timeout.ms": 6000,
-            "security.protocol": security_protocol,
-            "sasl.mechanisms": sasl_mechanisms,
-            "sasl.username": username,
-            "sasl.password": password,
-            'ssl.ca.location': self._create_temp_file(ssl_ca),
-            'ssl.key.location': self._create_temp_file(ssl_key),
-            'ssl.certificate.location': self._create_temp_file(ssl_certificate),
-            # we are controlling offset ourselves, by default start from start
-            "auto.offset.reset": "smallest",
-            "enable.auto.commit": True,
-            "logger": logger
-        }
-        if debug:
-            configuration['debug'] = 'consumer, broker'
-
-        if config_params:
-            configuration.update(config_params)
-
-        # kafka config can't handle None or "" values
-        configuration = {key: value for key, value in configuration.items() if value is not None}
+        configuration = build_configuration(self, servers, group_id, client_id, logger, security_protocol,
+                                            sasl_mechanisms, username=username, password=password, ssl_ca=ssl_ca,
+                                            ssl_key=ssl_key, ssl_certificate=ssl_certificate, start_offset=start_offset,
+                                            config_params=config_params, debug=debug)
 
         if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")

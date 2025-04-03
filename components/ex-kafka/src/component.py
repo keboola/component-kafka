@@ -17,7 +17,7 @@ from keboola.component.dao import ColumnDefinition, BaseType
 
 from configuration import Configuration
 
-from common.src.kafka_client import KafkaClient
+from common.src.kafka_client import KafkaConsumer
 
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
