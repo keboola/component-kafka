@@ -223,20 +223,20 @@ class Component(ComponentBase):
         return base_type
 
     def _init_client(self, debug, params, prev_offsets, servers):
-        c = KafkaClient(servers=servers,
-                        group_id=params.group_id,
-                        client_id=params.client_id,
-                        security_protocol=params.security_protocol,
-                        sasl_mechanisms=params.sasl_mechanisms,
-                        username=params.username,
-                        password=params.password,
-                        ssl_ca=params.ssl_ca,
-                        ssl_key=params.ssl_key,
-                        ssl_certificate=params.ssl_certificate,
-                        logger=logging.getLogger(),
-                        start_offset=prev_offsets,
-                        config_params=params.kafka_extra_params,
-                        debug=debug)
+        c = KafkaConsumer(servers=servers,
+                          group_id=params.group_id,
+                          client_id=params.client_id,
+                          security_protocol=params.security_protocol,
+                          sasl_mechanisms=params.sasl_mechanisms,
+                          username=params.username,
+                          password=params.password,
+                          ssl_ca=params.ssl_ca,
+                          ssl_key=params.ssl_key,
+                          ssl_certificate=params.ssl_certificate,
+                          logger=logging.getLogger(),
+                          start_offset=prev_offsets,
+                          config_params=params.kafka_extra_params,
+                          debug=debug)
         return c
 
     def safe_update(self, extracted_data, value):
