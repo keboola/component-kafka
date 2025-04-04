@@ -1,36 +1,53 @@
 import logging
 import tempfile
 
-from confluent_kafka import Consumer, TopicPartition
+from confluent_kafka import Producer, Consumer, TopicPartition
 
 # maximum time (s) the consumer is waiting for next message
 NEXT_MSG_TIMEOUT = 60
 
 
-def build_configuration(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
-                        username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,
-                        start_offset=None, config_params=None,
-                        debug=False):
-
+def build_configuration(
+    self,
+    servers,
+    client_id,
+    logger,
+    security_protocol,
+    sasl_mechanisms,
+    group_id=None,
+    username=None,
+    password=None,
+    ssl_ca=None,
+    ssl_key=None,
+    ssl_certificate=None,
+    config_params=None,
+    debug=False,
+):
     configuration = {
         "bootstrap.servers": servers,
         "group.id": group_id,
         "client.id": client_id,
-        "session.timeout.ms": 6000,
         "security.protocol": security_protocol,
         "sasl.mechanisms": sasl_mechanisms,
         "sasl.username": username,
         "sasl.password": password,
-        'ssl.ca.location': self._create_temp_file(ssl_ca),
-        'ssl.key.location': self._create_temp_file(ssl_key),
-        'ssl.certificate.location': self._create_temp_file(ssl_certificate),
-        # we are controlling offset ourselves, by default start from start
-        "auto.offset.reset": "smallest",
-        "enable.auto.commit": True,
-        "logger": logger
+        "ssl.ca.location": self._create_temp_file(ssl_ca),
+        "ssl.key.location": self._create_temp_file(ssl_key),
+        "ssl.certificate.location": self._create_temp_file(ssl_certificate),
+        "logger": logger,
     }
     if debug:
-        configuration['debug'] = 'consumer, broker'
+        configuration["debug"] = "consumer, broker"
+
+    if group_id:  # if consumer add following params
+        configuration.update(
+            {
+                "session.timeout.ms": 6000,
+                # we are controlling offset ourselves, by default start from start
+                "auto.offset.reset": "smallest",
+                "enable.auto.commit": True,
+            }
+        )
 
     if config_params:
         configuration.update(config_params)
@@ -39,17 +56,90 @@ def build_configuration(self, servers, group_id, client_id, logger, security_pro
     return {key: value for key, value in configuration.items() if value is not None}
 
 
-class KafkaConsumer():
+class KafkaProducer:
+    def __init__(
+        self,
+        servers,
+        client_id,
+        logger,
+        security_protocol,
+        sasl_mechanisms,
+        username=None,
+        password=None,
+        ssl_ca=None,
+        ssl_key=None,
+        ssl_certificate=None,
+        config_params=None,
+        debug=False,
+    ):
+        configuration = build_configuration(
+            self,
+            servers,
+            client_id,
+            logger,
+            security_protocol,
+            sasl_mechanisms,
+            username=username,
+            password=password,
+            ssl_ca=ssl_ca,
+            ssl_key=ssl_key,
+            ssl_certificate=ssl_certificate,
+            config_params=config_params,
+            debug=debug,
+        )
 
-    def __init__(self, servers, group_id, client_id, logger, security_protocol, sasl_mechanisms,
-                 username=None, password=None, ssl_ca=None, ssl_key=None, ssl_certificate=None,
-                 start_offset=None, config_params=None,
-                 debug=False):
+        self.producer = Producer(**configuration)
 
-        configuration = build_configuration(self, servers, group_id, client_id, logger, security_protocol,
-                                            sasl_mechanisms, username=username, password=password, ssl_ca=ssl_ca,
-                                            ssl_key=ssl_key, ssl_certificate=ssl_certificate, start_offset=start_offset,
-                                            config_params=config_params, debug=debug)
+    def list_topics(self):
+        return self.producer.list_topics(timeout=60).topics
+
+    def produce_message(self, topic, key, value):
+        self.producer.produce(topic=topic, key=key, value=value)
+        self.producer.flush()
+
+    @staticmethod
+    def _create_temp_file(content, suffix=".pem"):
+        if content:
+            temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+            temp_file.write(content.encode())
+            temp_file.close()
+            return temp_file.name
+
+
+class KafkaConsumer:
+    def __init__(
+        self,
+        servers,
+        group_id,
+        client_id,
+        logger,
+        security_protocol,
+        sasl_mechanisms,
+        username=None,
+        password=None,
+        ssl_ca=None,
+        ssl_key=None,
+        ssl_certificate=None,
+        start_offset=None,
+        config_params=None,
+        debug=False,
+    ):
+        configuration = build_configuration(
+            self,
+            servers,
+            group_id,
+            client_id,
+            logger,
+            security_protocol,
+            sasl_mechanisms,
+            username=username,
+            password=password,
+            ssl_ca=ssl_ca,
+            ssl_key=ssl_key,
+            ssl_certificate=ssl_certificate,
+            config_params=config_params,
+            debug=debug,
+        )
 
         if not start_offset:
             logging.info("No start offset specified, smallest offset will be used.")
@@ -83,25 +173,24 @@ class KafkaConsumer():
         consumer.assign(partitions)
 
     def consume_message_batch(self, topic):
-
         self.consumer.subscribe([topic], on_assign=self._set_start_offsets)
 
         # get highest offset for current topic
         max_offsets = self._get_max_offsets(topic)
 
-        logging.info(F"Subscribed to the topic {topic}")
+        logging.info(f"Subscribed to the topic {topic}")
         # Data extraction
         do_poll = True
         # poll until timeout is reached or the max offset is received
         while do_poll:
             logging.info("Reading...")
             consume_pars = dict()
-            consume_pars['timeout'] = NEXT_MSG_TIMEOUT
+            consume_pars["timeout"] = NEXT_MSG_TIMEOUT
 
             msgs = self.consumer.consume(**consume_pars)
             if not msgs:
                 # polling timeouted, stop
-                logging.info(F'Polling timeouted, there was no message received for more than {NEXT_MSG_TIMEOUT}s')
+                logging.info(f"Polling timeouted, there was no message received for more than {NEXT_MSG_TIMEOUT}s")
                 do_poll = False
 
             for msg in msgs:
@@ -118,18 +207,18 @@ class KafkaConsumer():
                 yield msg
 
     def _get_max_offsets(self, topic):
-        logging.debug('Getting offset boundaries for all partitions.')
+        logging.debug("Getting offset boundaries for all partitions.")
         offsets = dict()
         curr_topics = self.consumer.list_topics(timeout=60).topics
         if not curr_topics.get(topic):
-            raise ValueError(F'The topic: "{topic}" does not exist. Available topics are: {curr_topics}')
+            raise ValueError(f'The topic: "{topic}" does not exist. Available topics are: {curr_topics}')
         for p in curr_topics[topic].partitions:
             boundaries = self.consumer.get_watermark_offsets(TopicPartition(topic, p))
             # store only if there are some new messages
             if boundaries[1] > 0:
                 # decrement to get max existing offset
                 offsets[p] = boundaries[1] - 1
-        logging.debug(F'Offset boundaries listed successfully. {offsets}')
+        logging.debug(f"Offset boundaries listed successfully. {offsets}")
         return offsets
 
     def list_topics(self):

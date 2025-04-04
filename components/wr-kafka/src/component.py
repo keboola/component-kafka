@@ -3,264 +3,260 @@ Template Component main class.
 
 """
 
-import logging
-import os
 import csv
+import io
 import json
-from collections import OrderedDict
-import polars
+import logging
+import time
+import fastavro
+from fastavro.schema import parse_schema
+from common.src.kafka_client import KafkaProducer
 
-from keboola.component.base import ComponentBase, sync_action
-from keboola.component.sync_actions import SelectElement, ValidationResult, MessageType
-from keboola.component.exceptions import UserException
-from keboola.component.dao import ColumnDefinition, BaseType
-
+# from components.common.src.kafka_client import KafkaProducer
 from configuration import Configuration
-
-from common.src.kafka_client import KafkaClient
-
 from confluent_kafka.schema_registry import SchemaRegistryClient
-from confluent_kafka.schema_registry.avro import AvroDeserializer
-from confluent_kafka.serialization import SerializationContext, MessageField
+from confluent_kafka.schema_registry.avro import AvroSerializer
+from confluent_kafka.serialization import MessageField, SerializationContext
+from keboola.component.base import ComponentBase, sync_action
+from keboola.component.exceptions import UserException
+from keboola.component.sync_actions import SelectElement
 
 # global constants
-RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
-RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key', 'value']
-RESULT_COLS_DTYPES = ['string', 'string', 'timestamp', 'int', 'int', 'string', 'string']
+RESULT_PK = ["topic", "timestamp_type", "timestamp", "partition", "offset", "key"]
+RESULT_COLS = ["topic", "timestamp_type", "timestamp", "partition", "offset", "key", "value"]
+RESULT_COLS_DTYPES = ["string", "string", "timestamp", "int", "int", "string", "string"]
 
 
 class Component(ComponentBase):
-
     def __init__(self):
         self.params = None
         self.client = None
-        self.topics = dict()
-        self.columns = dict()
-        self.latest_offsets = dict()
+        self.serializer = None
+        self.avro_schema = None
+        self.schema_registry_client = None
         super().__init__()
 
     def run(self, debug=False):
-        """
-        Main execution code
-
-        TODO - statistics when DEBUG in conf dict:
-        stats_cb(json_str): Callback for statistics data. This callback is triggered by poll() or
-        flush every statistics.interval.ms (needs to be configured separately).
-         Function argument json_str is a str instance of a JSON document containing
-         statistics data. This callback is served upon calling client.poll() or producer.flush().
-         See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
-        """
-
         self.params = Configuration(**self.configuration.parameters)
         self._validate_stack_params()
 
-        self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}" or "kbc-proj-0"
         self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
 
-        # Generating a string out of the list
         servers = ",".join(self.params.servers)
+        self.client = self._init_client(debug, self.params, servers)
 
-        self.columns = self.get_state_file().get("columns", dict())
-        self.latest_offsets = self.get_state_file().get("prev_offsets", dict())
+        if self.params.serialize == "avro":
+            self._init_avro_serializer()
 
-        self.client = self._init_client(debug, self.params, self.latest_offsets, servers)
+        input_tables = self.get_input_tables_definitions()
 
-        logging.info("Extracting data from topics {0}".format(self.params.topics))
+        if len(input_tables) != 1:
+            raise UserException("Exactly one input table is expected.")
 
-        for topic in self.params.topics:
-            msg_cnt, res_file_folder, schema = self.consume_topic(topic)
-            self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder, 'schema': schema}
+        input_table = input_tables[0]
 
-        # Store previous offsets and columns
-        state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
-        self.write_state_file(state_dict)
-        logging.info("Offset file stored.")
+        logging.info(f"Writing data from table: {input_table.name} to the topic: {self.params.topic}")
 
-        self.produce_manifest()
-        logging.info("Extraction finished.")
+        start_time = time.time()
+
+        with open(input_table.full_path, "r") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                self.write_line(row)
+
+        logging.info("Writing finished.")
+        logging.info(f"Total time taken: {time.time() - start_time:.2f} seconds")
 
     def _validate_stack_params(self):
         image_parameters = self.configuration.image_parameters or {}
-        allowed_hosts = [f"{host.get('host')}:{host.get('port')}" for host in image_parameters.get('allowed_hosts', [])]
+        allowed_hosts = [f"{host.get('host')}:{host.get('port')}" for host in image_parameters.get("allowed_hosts", [])]
 
         if allowed_hosts:
             for item in self.params.servers:
                 if item not in allowed_hosts:
                     raise UserException(f"Host {item} is not allowed")
 
-    def produce_manifest(self):
-        for topic, consumed in self.topics.items():
+    def _init_avro_serializer(self):
+        # Convert the schema string to a fastavro schema
+        self.avro_schema = parse_schema(json.loads(self.params.schema_str))
 
-            schema = OrderedDict()
-            for col, dtype in zip(RESULT_COLS, RESULT_COLS_DTYPES):
-                schema[col] = ColumnDefinition(data_types=self.convert_dtypes(dtype))
+        if self.params.schema_registry_url:
+            config = self.params.schema_registry_extra_params
+            config["url"] = self.params.schema_registry_url
+            self.schema_registry_client = SchemaRegistryClient(config)
 
-            if consumed.get('schema'):
-                del schema['value']
-
-            for col in consumed.get('schema'):
-                schema[col.get('name')] = ColumnDefinition(data_types=self.convert_dtypes(col.get('type')))
-
-            # Produce final sliced table manifest
-            if consumed['msg_cnt'] > 0:
-                logging.info(F'Fetched {consumed['msg_cnt']} messages from topic - {topic}')
-                out_table = self.create_out_table_definition(consumed['res_file_folder'], is_sliced=True,
-                                                             primary_key=RESULT_PK, schema=schema,
-                                                             incremental=True)
-
-                self.write_manifest(out_table)
+            if self.params.schema_str:
+                # Restore the manual schema registration that was working before
+                self._register_schema(self.params.topic)
+                self.serializer = AvroSerializer(self.schema_registry_client, self.params.schema_str)
             else:
-                logging.info('No new messages found!')
-
-    def consume_topic(self, topic):
-
-        self.columns.setdefault(topic, RESULT_COLS)
-
-        deserializer = self.get_deserializer()
-
-        res_file_folder = os.path.join(self.tables_out_path, topic)
-        msg_cnt = 0
-        last_message = None
-        dtypes = []
-        for msg in self.client.consume_message_batch(topic):
-            if msg is None:
-                break
-            if msg.error():
-                logging.error("Consumer error: {}".format(msg.error()))
-                continue
-
-            extracted_data, last_message = self.get_message_data(deserializer, last_message, msg, topic)
-
-            filename = (("p{0}-{1}.csv").format(
-                msg.partition(),
-                msg.offset() // 10_000,
-            ))
-
-            logging.debug(F'Received message: {extracted_data}')
-
-            # Save data as a sliced table file in defined folder
-            self.save_file(extracted_data, os.path.join(res_file_folder, filename), topic)
-            msg_cnt += 1
-
-            print(msg.partition())
-
-            if msg.topic() not in self.latest_offsets:
-                self.latest_offsets[msg.topic()] = {}
-
-            self.latest_offsets[msg.topic()]['p' + str(msg.partition())] = msg.offset()
-
-        if self.params.deserialize == 'avro' and self.params.flatten_message_value_columns:
-            dtypes = self.get_topic_dtypes(last_message)
-
-        return msg_cnt, res_file_folder, dtypes
-
-    def get_message_data(self, deserializer, last_message, msg, topic):
-        if self.params.deserialize == 'avro':
-            value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+                try:
+                    subject_name = f"{self.params.topic}-value"
+                    metadata = self.schema_registry_client.get_latest_version(subject_name)
+                    schema_str = metadata.schema.schema_str
+                    self.serializer = AvroSerializer(self.schema_registry_client, schema_str)
+                except Exception as e:
+                    raise UserException(f"No schema string provided and could not fetch from registry: {str(e)}")
+        elif self.params.schema_str:
+            # No special serializer instantiation needed for fastavro
+            pass
         else:
-            value = msg.value().decode('utf-8')
-        if self.params.freeze_timestamp:  # freeze for datadir tests
-            timestamp = 1732104020556
-        else:
-            timestamp = msg.timestamp()[1]
-        extracted_data = {
-            'topic': msg.topic(),
-            'timestamp_type': msg.timestamp()[0],
-            'timestamp': timestamp,
-            'partition': msg.partition(),
-            'offset': msg.offset(),
-            'key': msg.key()}
-        if self.params.flatten_message_value_columns:
-            self.safe_update(extracted_data, value)
-            self.columns[topic] = list(extracted_data.keys())
-            last_message = msg.value()  # to get dtypes
-        else:
-            extracted_data['value'] = value
-        return extracted_data, last_message
+            raise UserException("Schema Registry URL or schema string must be provided for Avro serialization.")
 
-    def get_deserializer(self):
-        deserializer = None
-        if self.params.deserialize == 'avro':
-            if self.params.schema_registry_url:
-                config = self.params.schema_registry_extra_params
-                config['url'] = self.params.schema_registry_url
-                schema_registry_client = SchemaRegistryClient(config)
-                deserializer = AvroDeserializer(schema_registry_client)
-            elif self.params.schema_str:
-                deserializer = AvroDeserializer(self.params.schema_str)
-            else:
-                raise ValueError("Schema Registry URL or schema string must be provided for Avro deserialization.")
-        return deserializer
-
-    def get_topic_dtypes(self, message_value: str):
-        schema = None
-        if self.params.deserialize == 'avro':
-            if self.params.schema_registry_url:
-                config = self.params.schema_registry_extra_params
-                config['url'] = self.params.schema_registry_url
-                schema_registry_client = SchemaRegistryClient(config)
-                schema_id = int.from_bytes(message_value[1:5])
-                schema = json.loads(schema_registry_client.get_schema(schema_id).schema_str).get('fields')
-
-            elif self.params.schema_str:
-                schema = json.loads(self.params.schema_str).get('fields')
-
-        return schema
-
-    def convert_dtypes(self, dtype: str = 'string'):
-        match dtype:
-            case 'boolean':
-                base_type = BaseType.boolean()
-            case 'int':
-                base_type = BaseType.integer()
-            case 'float':
-                base_type = BaseType.float()
-            case 'double':
-                base_type = BaseType.float()
-            case _:
-                base_type = BaseType.string()
-
-        return base_type
-
-    def _init_client(self, debug, params, prev_offsets, servers):
-        c = KafkaClient(servers=servers,
-                        group_id=params.group_id,
-                        client_id=params.client_id,
-                        security_protocol=params.security_protocol,
-                        sasl_mechanisms=params.sasl_mechanisms,
-                        username=params.username,
-                        password=params.password,
-                        ssl_ca=params.ssl_ca,
-                        ssl_key=params.ssl_key,
-                        ssl_certificate=params.ssl_certificate,
-                        logger=logging.getLogger(),
-                        start_offset=prev_offsets,
-                        config_params=params.kafka_extra_params,
-                        debug=debug)
-        return c
-
-    def safe_update(self, extracted_data, value):
-        for key, val in value.items():
-            if key in extracted_data:
-                extracted_data[f"value_{key}"] = val
-            else:
-                extracted_data[key] = val
-
-    def save_file(self, line, filename, topic):
+    def _register_schema(self, topic):
         """
-        Save text as file
-        """
-        logging.info(F'Writing file {filename}')
+        Register schema with the Schema Registry once during component initialization.
 
-        if not os.path.exists(os.path.dirname(filename)):
-            os.makedirs(os.path.dirname(filename))
+        Args:
+            topic: The Kafka topic name for which to register the schema
+        """
+        config = self.params.schema_registry_extra_params
+        config["url"] = self.params.schema_registry_url
+        schema_registry_client = SchemaRegistryClient(config)
+
+        subject_name = f"{topic}-value"
         try:
-            with open(filename, 'a') as file:
-                writer = csv.DictWriter(file, fieldnames=self.columns[topic])
-                writer.writerow(line)
-            logging.info("File saved.")
+            # Manual registration using the REST API directly
+            headers = {"Content-Type": "application/vnd.schemaregistry.v1+json"}
+            schema_dict = {"schema": self.params.schema_str}
+
+            # Use request directly if _rest_client not available
+            import requests
+
+            url = f"{self.params.schema_registry_url}/subjects/{subject_name}/versions"
+            response = requests.post(url, json=schema_dict, headers=headers)
+            if response.status_code in (200, 201):
+                schema_id = response.json().get("id")
+                logging.info(f"Schema registered/updated in Schema Registry with ID: {schema_id}")
+            else:
+                raise Exception(f"Failed with status {response.status_code}: {response.text}")
         except Exception as e:
-            logging.error("Could not save file! exit.", e)
+            logging.error(f"Failed to register schema: {str(e)}")
+            logging.info("Continuing without explicit schema registration")
+
+    def write_line(self, row):
+        topic = self.params.topic
+        key = row.get(self.params.key_column_name, None)
+
+        if self.params.value_column_names:
+            value = {col: row[col] for col in self.params.value_column_names}
+        else:
+            value = row
+
+        serialized_value = self.serialize(value, topic)
+
+        self.client.produce_message(topic, key, serialized_value)
+
+    def serialize(self, value, topic):
+        serialize_method = self.params.serialize.lower()
+
+        # Ensure order_id is converted to integer if present
+        if 'order_id' in value and value['order_id'] is not None and value['order_id'] != '':
+            try:
+                value['order_id'] = int(value['order_id'])
+            except (ValueError, TypeError):
+                logging.warning(f"Could not convert order_id value '{value['order_id']}' to integer")
+                # If conversion fails, provide a default value or remove the field
+                # depending on whether it's required in your schema
+                value['order_id'] = 0  # Default value, adjust as needed
+
+        if serialize_method == "avro":
+            if self.params.schema_registry_url:
+                converted_value = self._convert_types_for_avro(value, self.avro_schema)
+                return self.serializer(converted_value, SerializationContext(topic, MessageField.VALUE))
+            else:
+                converted_value = self._convert_types_for_avro(value, self.avro_schema)
+                # Use fastavro for serialization
+                out = io.BytesIO()
+                fastavro.schemaless_writer(out, self.avro_schema, converted_value)
+                return out.getvalue()
+        elif serialize_method == "json":
+            return json.dumps(value).encode("utf-8")
+        else:
+            return str(value).encode("utf-8")
+
+    def _convert_types_for_avro(self, value: dict, schema: dict):
+        """
+        Convert input values to match the types required by Avro schema.
+        
+        Args:
+            value: The input data dictionary
+            schema: The fastavro schema dictionary
+            
+        Returns:
+            A dictionary with values converted to appropriate types for Avro
+        """
+        converted_value = {}
+        
+        # For fastavro, we need to process the schema differently
+        schema_fields = schema.get('fields', [])
+        
+        for field in schema_fields:
+            field_name = field.get('name')
+            
+            # Skip fields not in the input data
+            if field_name not in value:
+                continue
+                
+            field_value = value[field_name]
+            field_type = field.get('type')
+            
+            # Handle union types (represented as lists in fastavro schemas)
+            if isinstance(field_type, list):
+                # Use the first non-null type
+                for type_option in field_type:
+                    if type_option != 'null':
+                        field_type = type_option
+                        break
+                else:
+                    field_type = 'null'
+            
+            # Skip empty values
+            if field_value is None or field_value == "":
+                continue
+                
+            try:
+                # Simple type casting based on Avro type
+                if field_type == "string":
+                    converted_value[field_name] = str(field_value)
+                elif field_type == "int":
+                    converted_value[field_name] = int(field_value)
+                elif field_type == "long":
+                    converted_value[field_name] = int(field_value)
+                elif field_type == "boolean":
+                    converted_value[field_name] = (
+                        bool(int(field_value)) if field_value in ("0", "1") else field_value.lower() == "true"
+                    )
+                elif field_type == "float" or field_type == "double":
+                    converted_value[field_name] = float(field_value)
+                elif field_type == "bytes":
+                    converted_value[field_name] = field_value.encode("utf-8") if isinstance(field_value, str) else field_value
+                else:
+                    # For unknown types, keep as string
+                    converted_value[field_name] = str(field_value)
+            except Exception as e:
+                # If casting fails, just keep the original value
+                logging.warning(f"Failed to cast {field_name}: {str(e)}")
+                converted_value[field_name] = field_value
+                
+        return converted_value
+
+    def _init_client(self, debug, params, servers):
+        c = KafkaProducer(
+            servers=servers,
+            client_id=params.client_id,
+            security_protocol=params.security_protocol,
+            sasl_mechanisms=params.sasl_mechanisms,
+            username=params.username,
+            password=params.password,
+            ssl_ca=params.ssl_ca,
+            ssl_key=params.ssl_key,
+            ssl_certificate=params.ssl_certificate,
+            logger=logging.getLogger(),
+            config_params=params.kafka_extra_params,
+            debug=debug,
+        )
+        return c
 
     @sync_action("list_topics")
     def list_topics(self):
@@ -272,31 +268,6 @@ class Component(ComponentBase):
         topics_names = [SelectElement(topics.get(t).topic) for t in topics]
 
         return topics_names
-
-    @sync_action("message_preview")
-    def message_preview(self):
-        self.params = Configuration(**self.configuration.parameters)
-        servers = ",".join(self.params.servers)
-
-        c = self._init_client(False, self.params, dict(), servers)
-        deserializer = self.get_deserializer()
-        last_message = None
-        topic = self.params.topics[0]
-        for msg in c.consume_message_batch(topic):
-            if msg is None:
-                break
-            if msg.error():
-                logging.error("Consumer error: {}".format(msg.error()))
-                continue
-
-            extracted_data, _ = self.get_message_data(deserializer, last_message, msg, topic)
-
-            polars.Config.set_tbl_formatting("ASCII_MARKDOWN")
-            polars.Config.set_tbl_hide_dataframe_shape(True)
-            df = polars.DataFrame(extracted_data.get('value'))
-            md_table_output = str(df)
-
-            return ValidationResult(md_table_output, MessageType.SUCCESS)
 
 
 """

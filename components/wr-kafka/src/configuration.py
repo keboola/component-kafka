@@ -15,7 +15,7 @@ class Configuration(BaseModel):
     group_id: str = Field(default=None)
     client_id: str = Field(default=None)
 
-    topics: list[str] = Field(default=None)
+    topic: str
 
     security_protocol: str = Field(default=None)
     sasl_mechanisms: str = Field(default=None)
@@ -31,8 +31,9 @@ class Configuration(BaseModel):
 
     kafka_extra_params: str = Field(default=None)
 
-    deserialize: str = Field(default=None)
-    flatten_message_value_columns: bool = True
+    key_column_name: str = ""
+    value_column_names: list[str] = []
+    serialize: str = Field(default=None)
     schema_str: str = Field(default=None)
     schema_registry_url: str = Field(default=None)
     schema_registry_extra_params: str = Field(default={})

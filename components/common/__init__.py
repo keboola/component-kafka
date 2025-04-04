@@ -1,1 +1,2 @@
-from common.src.kafka_client import KafkaClient  # noqa F401
+# from common.src.kafka_client import KafkaProducer  # noqa F401
+from components.common.src.kafka_client import KafkaProducer  # noqa F401
