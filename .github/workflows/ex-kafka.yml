@@ -1,5 +1,5 @@
-# This workflow is used to build and deploy the ex-kafka-consumer component
-name: ex-kafka-consumer
+# This workflow is used to build and deploy the ex-kafka component
+name: ex-kafka
 
 on:
   push:
