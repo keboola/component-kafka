@@ -24,30 +24,20 @@
     },
     "deserialize": {
       "enum": [
-        "no",
-        "avro"
+        "text",
+        "avro",
+        "json"
       ],
       "type": "string",
       "title": "Deserialize message value",
       "options": {
         "enum_titles": [
-          "No",
-          "Avro"
+          "Text",
+          "Avro",
+          "JSON"
         ]
       },
       "propertyOrder": 2
-    },
-    "flatten_message_value_columns": {
-      "type": "boolean",
-      "title": "Flatten message value",
-      "format": "checkbox",
-      "description": "Store message value columns to table columns",
-      "propertyOrder": 3,
-      "options": {
-        "dependencies": {
-          "deserialize": "avro"
-        }
-      }
     },
     "schema_source": {
       "enum": [
@@ -55,8 +45,11 @@
         "schema_registry"
       ],
       "type": "string",
-      "title": "Deserialize message value",
+      "title": "Deserialization schema source",
       "options": {
+        "dependencies": {
+          "deserialize": "avro"
+        },
         "enum_titles": [
           "User defined",
           "From schema registry"
@@ -96,16 +89,37 @@
       },
       "propertyOrder": 7
     },
-    "table_preview": {
-      "type": "button",
-      "format": "sync-action",
+    "key_column_name": {
+      "type": "string",
+      "title": "Avro schema string",
       "options": {
-        "async": {
-          "label": "Message preview",
-          "action": "message_preview"
+        "dependencies": {
+          "schema_source": "user_defined"
         }
       },
       "propertyOrder": 8
-    }
+    },
+    "value_column_names": {
+          "type": "array",
+          "items": {
+            "enum": [],
+            "type": "string"
+          },
+          "title": "Message value columns",
+          "description": "Columns to be added to the message value payload, if empty all columns will be added.",
+          "format": "select",
+          "options": {
+            "tags": true,
+            "async": {
+              "label": "Re-load columns",
+              "action": "list_columns"
+            },
+            "dependencies": {
+              "mode": "select_columns"
+            }
+          },
+          "uniqueItems": true,
+          "propertyOrder": 9
+        }
   }
 }

@@ -12,7 +12,6 @@ class Units(str, Enum):
 
 class Configuration(BaseModel):
     servers: list[str] = Field(default=None)
-    group_id: str = Field(default=None)
     client_id: str = Field(default=None)
 
     topic: str
@@ -27,8 +26,6 @@ class Configuration(BaseModel):
     ssl_key: str = Field(default=None)
     ssl_certificate: str = Field(default=None)
 
-    begin_offsets: str = Field(default=None)
-
     kafka_extra_params: str = Field(default=None)
 
     key_column_name: str = ""
@@ -39,7 +36,6 @@ class Configuration(BaseModel):
     schema_registry_extra_params: str = Field(default={})
 
     debug: bool = False
-    freeze_timestamp: bool = False
 
     def __init__(self, **data):
         try:

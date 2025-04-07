@@ -20,14 +20,12 @@
   },
   "parameters": {
     "servers": ["broker:9092"],
-    "group_id": "my-group",
     "topic": "test-avro-schema-registry",
     "key_column_name":"row_number",
     "value_column_names": ["row_number", "order_id", "order_date", "order_amount", "discount", "is_active", "double", "large_number", "text"],
     "serialize": "avro",
     "schema_registry_url": "http://schema-registry:8081",
     "debug": true,
-    "freeze_timestamp": true,
     "schema_str": "{\n  \"type\": \"record\",\n  \"name\": \"Message\",\n  \"fields\": [\n    {\"name\": \"row_number\", \"type\": \"int\"},\n    {\"name\": \"order_id\", \"type\": \"int\"},\n    {\"name\": \"order_date\", \"type\": \"string\"},\n    {\"name\": \"order_amount\", \"type\": \"double\"},\n    {\"name\": \"discount\", \"type\": \"double\"},\n    {\"name\": \"is_active\", \"type\": \"boolean\"},\n  {\"name\": \"double\", \"type\": \"double\"},\n    {\"name\": \"large_number\", \"type\": \"double\"},\n    {\"name\": \"text\", \"type\": \"string\"}\n  ]\n}"
   },
   "image_parameters": {

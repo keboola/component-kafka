@@ -112,12 +112,6 @@
       "title": "Additional Kafka parameters",
         "description": "Dictionary of additional <a href='https://kafka.apache.org/documentation/#configuration'>Kafka parameters</a> in the format {\"auto.offset.reset\": \"smallest\", \"session.timeout.ms\": 6000\n} ",
       "propertyOrder": 9
-    },
-    "group_id": {
-      "type": "string",
-      "title": "Group ID",
-        "description": "Group ID for the consumer",
-      "propertyOrder": 10
     }
   }
 }

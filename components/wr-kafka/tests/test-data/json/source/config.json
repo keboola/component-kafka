@@ -20,13 +20,11 @@
   },
   "parameters": {
     "servers": ["broker:9092"],
-    "group_id": "my-group",
     "topic": "test-json",
     "key_column_name":"row_number",
     "value_column_names": ["row_number", "order_id", "order_date", "order_amount", "discount", "is_active", "double", "large_number", "text"],
     "serialize": "json",
-    "debug": true,
-    "freeze_timestamp": true
+    "debug": true
   },
   "image_parameters": {
     "syrup_url": "https://syrup.keboola.com/"
