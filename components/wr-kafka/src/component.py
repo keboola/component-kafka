@@ -8,8 +8,8 @@ import io
 import json
 import logging
 import time
+
 import fastavro
-from fastavro.schema import parse_schema
 from common.src.kafka_client import KafkaProducer
 
 # from components.common.src.kafka_client import KafkaProducer
@@ -17,14 +17,10 @@ from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
+from fastavro.schema import parse_schema
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
-
-# global constants
-RESULT_PK = ["topic", "timestamp_type", "timestamp", "partition", "offset", "key"]
-RESULT_COLS = ["topic", "timestamp_type", "timestamp", "partition", "offset", "key", "value"]
-RESULT_COLS_DTYPES = ["string", "string", "timestamp", "int", "int", "string", "string"]
 
 
 class Component(ComponentBase):
@@ -86,8 +82,7 @@ class Component(ComponentBase):
             self.schema_registry_client = SchemaRegistryClient(config)
 
             if self.params.schema_str:
-                # Restore the manual schema registration that was working before
-                self._register_schema(self.params.topic)
+                # Let AvroSerializer handle schema registration automatically
                 self.serializer = AvroSerializer(self.schema_registry_client, self.params.schema_str)
             else:
                 try:
@@ -102,37 +97,6 @@ class Component(ComponentBase):
             pass
         else:
             raise UserException("Schema Registry URL or schema string must be provided for Avro serialization.")
-
-    def _register_schema(self, topic):
-        """
-        Register schema with the Schema Registry once during component initialization.
-
-        Args:
-            topic: The Kafka topic name for which to register the schema
-        """
-        config = self.params.schema_registry_extra_params
-        config["url"] = self.params.schema_registry_url
-        schema_registry_client = SchemaRegistryClient(config)
-
-        subject_name = f"{topic}-value"
-        try:
-            # Manual registration using the REST API directly
-            headers = {"Content-Type": "application/vnd.schemaregistry.v1+json"}
-            schema_dict = {"schema": self.params.schema_str}
-
-            # Use request directly if _rest_client not available
-            import requests
-
-            url = f"{self.params.schema_registry_url}/subjects/{subject_name}/versions"
-            response = requests.post(url, json=schema_dict, headers=headers)
-            if response.status_code in (200, 201):
-                schema_id = response.json().get("id")
-                logging.info(f"Schema registered/updated in Schema Registry with ID: {schema_id}")
-            else:
-                raise Exception(f"Failed with status {response.status_code}: {response.text}")
-        except Exception as e:
-            logging.error(f"Failed to register schema: {str(e)}")
-            logging.info("Continuing without explicit schema registration")
 
     def write_line(self, row):
         topic = self.params.topic
@@ -150,96 +114,27 @@ class Component(ComponentBase):
     def serialize(self, value, topic):
         serialize_method = self.params.serialize.lower()
 
-        # Ensure order_id is converted to integer if present
-        if 'order_id' in value and value['order_id'] is not None and value['order_id'] != '':
-            try:
-                value['order_id'] = int(value['order_id'])
-            except (ValueError, TypeError):
-                logging.warning(f"Could not convert order_id value '{value['order_id']}' to integer")
-                # If conversion fails, provide a default value or remove the field
-                # depending on whether it's required in your schema
-                value['order_id'] = 0  # Default value, adjust as needed
+        # # Ensure order_id is converted to integer if present
+        # if "order_id" in value and value["order_id"] is not None and value["order_id"] != "":
+        #     try:
+        #         value["order_id"] = int(value["order_id"])
+        #     except (ValueError, TypeError):
+        #         logging.warning(f"Could not convert order_id value '{value['order_id']}' to integer")
+        #         # If conversion fails, provide a default value or remove the field
+        #         # depending on whether it's required in your schema
+        #         value["order_id"] = 0  # Default value, adjust as needed
 
         if serialize_method == "avro":
             if self.params.schema_registry_url:
-                converted_value = self._convert_types_for_avro(value, self.avro_schema)
-                return self.serializer(converted_value, SerializationContext(topic, MessageField.VALUE))
+                return self.serializer(value, SerializationContext(topic, MessageField.VALUE))
             else:
-                converted_value = self._convert_types_for_avro(value, self.avro_schema)
-                # Use fastavro for serialization
                 out = io.BytesIO()
-                fastavro.schemaless_writer(out, self.avro_schema, converted_value)
+                fastavro.schemaless_writer(out, self.avro_schema, value)
                 return out.getvalue()
         elif serialize_method == "json":
             return json.dumps(value).encode("utf-8")
         else:
             return str(value).encode("utf-8")
-
-    def _convert_types_for_avro(self, value: dict, schema: dict):
-        """
-        Convert input values to match the types required by Avro schema.
-        
-        Args:
-            value: The input data dictionary
-            schema: The fastavro schema dictionary
-            
-        Returns:
-            A dictionary with values converted to appropriate types for Avro
-        """
-        converted_value = {}
-        
-        # For fastavro, we need to process the schema differently
-        schema_fields = schema.get('fields', [])
-        
-        for field in schema_fields:
-            field_name = field.get('name')
-            
-            # Skip fields not in the input data
-            if field_name not in value:
-                continue
-                
-            field_value = value[field_name]
-            field_type = field.get('type')
-            
-            # Handle union types (represented as lists in fastavro schemas)
-            if isinstance(field_type, list):
-                # Use the first non-null type
-                for type_option in field_type:
-                    if type_option != 'null':
-                        field_type = type_option
-                        break
-                else:
-                    field_type = 'null'
-            
-            # Skip empty values
-            if field_value is None or field_value == "":
-                continue
-                
-            try:
-                # Simple type casting based on Avro type
-                if field_type == "string":
-                    converted_value[field_name] = str(field_value)
-                elif field_type == "int":
-                    converted_value[field_name] = int(field_value)
-                elif field_type == "long":
-                    converted_value[field_name] = int(field_value)
-                elif field_type == "boolean":
-                    converted_value[field_name] = (
-                        bool(int(field_value)) if field_value in ("0", "1") else field_value.lower() == "true"
-                    )
-                elif field_type == "float" or field_type == "double":
-                    converted_value[field_name] = float(field_value)
-                elif field_type == "bytes":
-                    converted_value[field_name] = field_value.encode("utf-8") if isinstance(field_value, str) else field_value
-                else:
-                    # For unknown types, keep as string
-                    converted_value[field_name] = str(field_value)
-            except Exception as e:
-                # If casting fails, just keep the original value
-                logging.warning(f"Failed to cast {field_name}: {str(e)}")
-                converted_value[field_name] = field_value
-                
-        return converted_value
 
     def _init_client(self, debug, params, servers):
         c = KafkaProducer(
