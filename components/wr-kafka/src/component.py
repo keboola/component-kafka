@@ -114,27 +114,77 @@ class Component(ComponentBase):
     def serialize(self, value, topic):
         serialize_method = self.params.serialize.lower()
 
-        # # Ensure order_id is converted to integer if present
-        # if "order_id" in value and value["order_id"] is not None and value["order_id"] != "":
-        #     try:
-        #         value["order_id"] = int(value["order_id"])
-        #     except (ValueError, TypeError):
-        #         logging.warning(f"Could not convert order_id value '{value['order_id']}' to integer")
-        #         # If conversion fails, provide a default value or remove the field
-        #         # depending on whether it's required in your schema
-        #         value["order_id"] = 0  # Default value, adjust as needed
-
         if serialize_method == "avro":
             if self.params.schema_registry_url:
-                return self.serializer(value, SerializationContext(topic, MessageField.VALUE))
+                converted_values = self._convert_types_for_avro(value, self.avro_schema)
+                return self.serializer(converted_values, SerializationContext(topic, MessageField.VALUE))
             else:
+                converted_values = self._convert_types_for_avro(value, self.avro_schema)
                 out = io.BytesIO()
-                fastavro.schemaless_writer(out, self.avro_schema, value)
+                fastavro.schemaless_writer(out, self.avro_schema, converted_values)
                 return out.getvalue()
         elif serialize_method == "json":
             return json.dumps(value).encode("utf-8")
         else:
             return str(value).encode("utf-8")
+
+    def _convert_types_for_avro(self, value: dict, schema: dict):
+        converted_value = {}
+
+        # For fastavro, we need to process the schema differently
+        schema_fields = schema.get("fields", [])
+
+        for field in schema_fields:
+            field_name = field.get("name")
+
+            # Skip fields not in the input data
+            if field_name not in value:
+                continue
+
+            field_value = value[field_name]
+            field_type = field.get("type")
+
+            # Handle union types (represented as lists in fastavro schemas)
+            if isinstance(field_type, list):
+                # Use the first non-null type
+                for type_option in field_type:
+                    if type_option != "null":
+                        field_type = type_option
+                        break
+                else:
+                    field_type = "null"
+
+            # Skip empty values
+            if field_value is None or field_value == "":
+                continue
+
+            try:
+                # Simple type casting based on Avro type
+                if field_type == "string":
+                    converted_value[field_name] = str(field_value)
+                elif field_type == "int":
+                    converted_value[field_name] = int(field_value)
+                elif field_type == "long":
+                    converted_value[field_name] = int(field_value)
+                elif field_type == "boolean":
+                    converted_value[field_name] = (
+                        bool(int(field_value)) if field_value in ("0", "1") else field_value.lower() == "true"
+                    )
+                elif field_type == "float" or field_type == "double":
+                    converted_value[field_name] = float(field_value)
+                elif field_type == "bytes":
+                    converted_value[field_name] = (
+                        field_value.encode("utf-8") if isinstance(field_value, str) else field_value
+                    )
+                else:
+                    # For unknown types, keep as string
+                    converted_value[field_name] = str(field_value)
+            except Exception as e:
+                # If casting fails, just keep the original value
+                logging.warning(f"Failed to cast {field_name}: {str(e)}")
+                converted_value[field_name] = field_value
+
+        return converted_value
 
     def _init_client(self, debug, params, servers):
         c = KafkaProducer(
