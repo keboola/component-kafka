@@ -11,8 +11,8 @@ Message payload can be either stored raw in the single column of output table or
 The schema for deserialization can be provided as schema string, or obtained from the schema registry if configured.
 If the payload is deserialized, it can be stored either as json in column, or all values flattend to columns.
 
-The consumer persists its "commited" offsets in its own state so it is completely independent of commit states 
-at Kafka and reading by other consumers in a same group won't affect it's setup. The last commited offset is used as 
+The consumer persists its "committed" offsets in its own state so it is completely independent of commit states 
+at Kafka and reading by other consumers in a same group won't affect it's setup. The last committed offset is used as 
 a starting offset each consecutive run.
 
 It is possible to override the starting offsets manually using `begin_offsets` parameter.

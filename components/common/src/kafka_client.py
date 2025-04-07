@@ -44,7 +44,7 @@ def build_configuration(
             {
                 "session.timeout.ms": 6000,
                 # we are controlling offset ourselves, by default start from start
-                "auto.offset.reset": "smallest",
+                "auto.offset.reset": "earliest",
                 "enable.auto.commit": True,
             }
         )
@@ -148,7 +148,7 @@ class KafkaConsumer:
 
         self.start_offsets = start_offset
         self.consumer = Consumer(**configuration)
-        logging.debug(self.consumer.assignment(servers))
+        logging.debug(self.consumer.assignment())
 
     @staticmethod
     def _create_temp_file(content, suffix=".pem"):

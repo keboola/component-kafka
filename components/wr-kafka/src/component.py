@@ -60,8 +60,7 @@ class Component(ComponentBase):
             for row in reader:
                 self.write_line(row)
 
-        logging.info("Writing finished.")
-        logging.info(f"Total time taken: {time.time() - start_time:.2f} seconds")
+        logging.info(f"Writing finished in {time.time() - start_time:.2f} seconds")
 
     def _validate_stack_params(self):
         image_parameters = self.configuration.image_parameters or {}
@@ -73,6 +72,9 @@ class Component(ComponentBase):
                     raise UserException(f"Host {item} is not allowed")
 
     def _init_avro_serializer(self):
+        if not self.params.schema_str:
+            raise UserException("Schema string is required for Avro serialization.")
+
         # Convert the schema string to a fastavro schema
         self.avro_schema = parse_schema(json.loads(self.params.schema_str))
 
@@ -92,11 +94,6 @@ class Component(ComponentBase):
                     self.serializer = AvroSerializer(self.schema_registry_client, schema_str)
                 except Exception as e:
                     raise UserException(f"No schema string provided and could not fetch from registry: {str(e)}")
-        elif self.params.schema_str:
-            # No special serializer instantiation needed for fastavro
-            pass
-        else:
-            raise UserException("Schema Registry URL or schema string must be provided for Avro serialization.")
 
     def write_line(self, row):
         topic = self.params.topic
