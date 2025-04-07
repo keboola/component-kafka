@@ -1,5 +1,5 @@
-# This workflow is used to build and deploy the ex-kafka component
-name: ex-kafka
+# This workflow is used to build and deploy the wr-kafka component
+name: wr-kafka
 
 on:
   push:
