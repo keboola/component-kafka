@@ -24,6 +24,7 @@ from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import SerializationContext, MessageField
 
 # global constants
+# Why is PK so complex? If the plan is to map topic = table, then message key should be enough
 RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
 RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key', 'value']
 RESULT_COLS_DTYPES = ['string', 'string', 'timestamp', 'int', 'int', 'string', 'string']
@@ -54,6 +55,11 @@ class Component(ComponentBase):
         self.params = Configuration(**self.configuration.parameters)
         self._validate_stack_params()
 
+        # Is this intentional? Same group id means that:
+        # > If client in two component configurations consume the same topic
+        # > partitions will be distributed evenly between these clients
+        # > in extreme cases, when topic has just 1 partitions but there 2 component configs
+        # > only one will actually consume something
         self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}" or "kbc-proj-0"
         self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
 
@@ -69,6 +75,10 @@ class Component(ComponentBase):
 
         for topic in self.params.topics:
             msg_cnt, res_file_folder, schema = self.consume_topic(topic)
+            # I wouldn't use dicts like this -- it pollutes the code with magic constants.
+            # Consider using a data class
+            # key `msg_cnt` is used 4 times in the code
+            # key `prev_offsets` (see next dict bellow) is used 3 times
             self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder, 'schema': schema}
 
         # Store previous offsets and columns
@@ -91,10 +101,15 @@ class Component(ComponentBase):
     def produce_manifest(self):
         for topic, consumed in self.topics.items():
 
+            # I'd consider extracting the schema translation logic into a standalone class
+            # Sooner or later somebod will require schema registry support an in such case
+            # there will be no schema in Kafka message. This way you will just use the right
+            # implementation here
             schema = OrderedDict()
             for col, dtype in zip(RESULT_COLS, RESULT_COLS_DTYPES):
                 schema[col] = ColumnDefinition(data_types=self.convert_dtypes(dtype))
 
+            # Might be worth commenting why this particular key is deleted here
             if consumed.get('schema'):
                 del schema['value']
 
@@ -139,6 +154,8 @@ class Component(ComponentBase):
             logging.debug(F'Received message: {extracted_data}')
 
             # Save data as a sliced table file in defined folder
+            # This is going to be very slow, considering you are opening and closing the file
+            # descript for every single line
             self.save_file(extracted_data, os.path.join(res_file_folder, filename), topic)
             msg_cnt += 1
 
@@ -149,6 +166,7 @@ class Component(ComponentBase):
 
             self.latest_offsets[msg.topic()]['p' + str(msg.partition())] = msg.offset()
 
+        # So "flattening" is supported only for avro?
         if self.params.deserialize == 'avro' and self.params.flatten_message_value_columns:
             dtypes = self.get_topic_dtypes(last_message)
 
@@ -163,6 +181,7 @@ class Component(ComponentBase):
             timestamp = 1732104020556
         else:
             timestamp = msg.timestamp()[1]
+        # Again, magic constants
         extracted_data = {
             'topic': msg.topic(),
             'timestamp_type': msg.timestamp()[0],
