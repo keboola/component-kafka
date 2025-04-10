@@ -172,6 +172,11 @@ class KafkaConsumer:
 
         consumer.assign(partitions)
 
+    # Note: first run might potentially run for very long time,
+    # > for topics with large number of messages
+    # > even more so considering we process topic serially
+    # > probably nothing we can do, just so that we are aware.
+    # > This is basically the same set of issues we face with CDC
     def consume_message_batch(self, topic):
         self.consumer.subscribe([topic], on_assign=self._set_start_offsets)
 
@@ -214,6 +219,7 @@ class KafkaConsumer:
             raise ValueError(f'The topic: "{topic}" does not exist. Available topics are: {curr_topics}')
         for p in curr_topics[topic].partitions:
             boundaries = self.consumer.get_watermark_offsets(TopicPartition(topic, p))
+            # this is actually a check for "if there are some messages", not strictly new
             # store only if there are some new messages
             if boundaries[1] > 0:
                 # decrement to get max existing offset

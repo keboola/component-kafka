@@ -5,6 +5,7 @@
     "servers"
   ],
   "properties": {
+    // ideally call this bootstrap, if you want a single word name
     "servers": {
         "type": "array",
         "uniqueItems": true,
@@ -16,7 +17,11 @@
           "tags": true
         },
         "format": "select",
+        // Stick to "Bootstrap Servers" as it will be familar to Kafka folks
+        // I had to go check the actuall client configuration to verify what it is
         "title": "Brokers addresses",
+        // This is misleading, it's actually just bootstrap list, providing one is sufficient to disvoer others
+        // though you usually want to have more than one to have failover
         "description": "List of all brokers in the Kafka cluster in the format host:port",
         "propertyOrder": 1
       },
@@ -110,6 +115,7 @@
     "kafka_extra_params": {
       "type": "string",
       "title": "Additional Kafka parameters",
+        // The right value is 'earliest' IIRC
         "description": "Dictionary of additional <a href='https://kafka.apache.org/documentation/#configuration'>Kafka parameters</a> in the format {\"auto.offset.reset\": \"smallest\", \"session.timeout.ms\": 6000\n} ",
       "propertyOrder": 9
     },
