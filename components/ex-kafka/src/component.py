@@ -24,7 +24,7 @@ from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import SerializationContext, MessageField
 
 # global constants
-RESULT_PK = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key']
+RESULT_PK = ['key', 'offset']
 RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'key', 'value']
 RESULT_COLS_DTYPES = ['string', 'string', 'timestamp', 'int', 'int', 'string', 'string']
 
