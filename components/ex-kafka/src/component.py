@@ -54,16 +54,17 @@ class Component(ComponentBase):
         self.params = Configuration(**self.configuration.parameters)
         self._validate_stack_params()
 
-        self.params.group_id = f"kbc-proj-{self.environment_variables.project_id}" or "kbc-proj-0"
-        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
+        self.params.group_id = (f"kbc-proj-{self.environment_variables.project_id or "local"}-"
+                                f"{self.environment_variables.config_row_id}")
+        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id or "local"}"
 
         # Generating a string out of the list
-        servers = ",".join(self.params.servers)
+        bootstrap_servers = ",".join(self.params.bootstrap_servers)
 
         self.columns = self.get_state_file().get("columns", dict())
         self.latest_offsets = self.get_state_file().get("prev_offsets", dict())
 
-        self.client = self._init_client(debug, self.params, self.latest_offsets, servers)
+        self.client = self._init_client(debug, self.params, self.latest_offsets, bootstrap_servers)
 
         logging.info("Extracting data from topics {0}".format(self.params.topics))
 
@@ -84,7 +85,7 @@ class Component(ComponentBase):
         allowed_hosts = [f"{host.get('host')}:{host.get('port')}" for host in image_parameters.get('allowed_hosts', [])]
 
         if allowed_hosts:
-            for item in self.params.servers:
+            for item in self.params.bootstrap_servers:
                 if item not in allowed_hosts:
                     raise UserException(f"Host {item} is not allowed")
 
@@ -222,8 +223,8 @@ class Component(ComponentBase):
 
         return base_type
 
-    def _init_client(self, debug, params, prev_offsets, servers):
-        c = KafkaConsumer(servers=servers,
+    def _init_client(self, debug, params, prev_offsets, bootstrap_servers):
+        c = KafkaConsumer(bootstrap_servers=bootstrap_servers,
                           group_id=params.group_id,
                           client_id=params.client_id,
                           security_protocol=params.security_protocol,
@@ -265,9 +266,9 @@ class Component(ComponentBase):
     @sync_action("list_topics")
     def list_topics(self):
         params = Configuration(**self.configuration.parameters)
-        servers = ",".join(params.servers)
+        bootstrap_servers = ",".join(params.bootstrap_servers)
 
-        c = self._init_client(False, params, dict(), servers)
+        c = self._init_client(False, params, dict(), bootstrap_servers)
         topics = c.list_topics()
         topics_names = [SelectElement(topics.get(t).topic) for t in topics]
 
@@ -276,9 +277,9 @@ class Component(ComponentBase):
     @sync_action("message_preview")
     def message_preview(self):
         self.params = Configuration(**self.configuration.parameters)
-        servers = ",".join(self.params.servers)
+        bootstrap_servers = ",".join(self.params.bootstrap_servers)
 
-        c = self._init_client(False, self.params, dict(), servers)
+        c = self._init_client(False, self.params, dict(), bootstrap_servers)
         deserializer = self.get_deserializer()
         last_message = None
         topic = self.params.topics[0]

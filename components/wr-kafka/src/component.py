@@ -38,8 +38,8 @@ class Component(ComponentBase):
 
         self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
 
-        servers = ",".join(self.params.servers)
-        self.client = self._init_client(debug, self.params, servers)
+        bootstrap_servers = ",".join(self.params.bootstrap_servers)
+        self.client = self._init_client(debug, self.params, bootstrap_servers)
 
         if self.params.serialize == "avro":
             self._init_avro_serializer()
@@ -67,7 +67,7 @@ class Component(ComponentBase):
         allowed_hosts = [f"{host.get('host')}:{host.get('port')}" for host in image_parameters.get("allowed_hosts", [])]
 
         if allowed_hosts:
-            for item in self.params.servers:
+            for item in self.params.bootstrap_servers:
                 if item not in allowed_hosts:
                     raise UserException(f"Host {item} is not allowed")
 
@@ -183,9 +183,9 @@ class Component(ComponentBase):
 
         return converted_value
 
-    def _init_client(self, debug, params, servers):
+    def _init_client(self, debug, params, bootstrap_servers):
         c = KafkaProducer(
-            servers=servers,
+            bootstrap_servers=bootstrap_servers,
             client_id=params.client_id,
             security_protocol=params.security_protocol,
             sasl_mechanisms=params.sasl_mechanisms,
@@ -203,9 +203,9 @@ class Component(ComponentBase):
     @sync_action("list_topics")
     def list_topics(self):
         params = Configuration(**self.configuration.parameters)
-        servers = ",".join(params.servers)
+        bootstrap_servers = ",".join(params.bootstrap_servers)
 
-        c = self._init_client(False, params, dict(), servers)
+        c = self._init_client(False, params, dict(), bootstrap_servers)
         topics = c.list_topics()
         topics_names = [SelectElement(topics.get(t).topic) for t in topics]
 

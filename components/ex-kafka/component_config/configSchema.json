@@ -5,7 +5,7 @@
     "servers"
   ],
   "properties": {
-    "servers": {
+    "bootstrap_servers": {
         "type": "array",
         "uniqueItems": true,
         "items": {
@@ -16,8 +16,8 @@
           "tags": true
         },
         "format": "select",
-        "title": "Brokers addresses",
-        "description": "List of all brokers in the Kafka cluster in the format host:port",
+        "title": "Bootstrap servers",
+        "description": "A list of one or more bootstrap servers in the Kafka cluster, specified in the format host:port.",
         "propertyOrder": 1
       },
     "security_protocol": {
@@ -110,7 +110,7 @@
     "kafka_extra_params": {
       "type": "string",
       "title": "Additional Kafka parameters",
-        "description": "Dictionary of additional <a href='https://kafka.apache.org/documentation/#configuration'>Kafka parameters</a> in the format {\"auto.offset.reset\": \"smallest\", \"session.timeout.ms\": 6000\n} ",
+        "description": "Dictionary of additional <a href='https://kafka.apache.org/documentation/#configuration'>Kafka parameters</a> in the format {\"auto.offset.reset\": \"earliest\", \"session.timeout.ms\": 6000\n} ",
       "propertyOrder": 9
     },
     "group_id": {

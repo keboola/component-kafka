@@ -9,7 +9,7 @@ NEXT_MSG_TIMEOUT = 60
 
 def build_configuration(
     self,
-    servers,
+    bootstrap_servers,
     client_id,
     logger,
     security_protocol,
@@ -24,7 +24,7 @@ def build_configuration(
     debug=False,
 ):
     configuration = {
-        "bootstrap.servers": servers,
+        "bootstrap.servers": bootstrap_servers,
         "group.id": group_id,
         "client.id": client_id,
         "security.protocol": security_protocol,
@@ -59,7 +59,7 @@ def build_configuration(
 class KafkaProducer:
     def __init__(
         self,
-        servers,
+        bootstrap_servers,
         client_id,
         logger,
         security_protocol,
@@ -74,7 +74,7 @@ class KafkaProducer:
     ):
         configuration = build_configuration(
             self,
-            servers=servers,
+            bootstrap_servers=bootstrap_servers,
             client_id=client_id,
             logger=logger,
             security_protocol=security_protocol,
@@ -109,7 +109,7 @@ class KafkaProducer:
 class KafkaConsumer:
     def __init__(
         self,
-        servers,
+        bootstrap_servers,
         group_id,
         client_id,
         logger,
@@ -126,7 +126,7 @@ class KafkaConsumer:
     ):
         configuration = build_configuration(
             self,
-            servers=servers,
+            bootstrap_servers=bootstrap_servers,
             client_id=client_id,
             logger=logger,
             security_protocol=security_protocol,

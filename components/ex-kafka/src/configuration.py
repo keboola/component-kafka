@@ -11,7 +11,7 @@ class Units(str, Enum):
 
 
 class Configuration(BaseModel):
-    servers: list[str] = Field(default=None)
+    bootstrap_servers: list[str] = Field(default=None)
     group_id: str = Field(default=None)
     client_id: str = Field(default=None)
 

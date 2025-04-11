@@ -10,7 +10,7 @@
     }
   },
   "parameters": {
-    "servers": ["broker:9092"],
+    "bootstrap_servers": ["broker:9092"],
     "group_id": "my-group2",
     "security_protocol": "PLAINTEXT",
     "topics": ["avro-value"],

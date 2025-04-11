@@ -9,9 +9,8 @@
       "tables": []
     }
   },
-  "yaction": "list_topics",
   "parameters": {
-    "servers": ["broker:9092"],
+    "bootstrap_servers": ["broker:9092"],
     "group_id": "my-group3",
     "security_protocol": "PLAINTEXT",
     "topics": ["avro-columns"],
