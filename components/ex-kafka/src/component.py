@@ -8,8 +8,9 @@ import os
 import csv
 import json
 from collections import OrderedDict
+from typing import TextIO
 import polars
-
+from dataclasses import dataclass
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.sync_actions import SelectElement, ValidationResult, MessageType
 from keboola.component.exceptions import UserException
@@ -29,6 +30,12 @@ RESULT_COLS = ['topic', 'timestamp_type', 'timestamp', 'partition', 'offset', 'k
 RESULT_COLS_DTYPES = ['string', 'string', 'timestamp', 'int', 'int', 'string', 'string']
 
 
+@dataclass
+class CachedWriter:
+    file: TextIO
+    writer: csv.DictWriter
+
+
 class Component(ComponentBase):
 
     def __init__(self):
@@ -37,6 +44,7 @@ class Component(ComponentBase):
         self.topics = dict()
         self.columns = dict()
         self.latest_offsets = dict()
+        self.writers: dict[str, CachedWriter] = {}
         super().__init__()
 
     def run(self, debug=False):
@@ -71,6 +79,8 @@ class Component(ComponentBase):
         for topic in self.params.topics:
             msg_cnt, res_file_folder, schema = self.consume_topic(topic)
             self.topics[topic] = {'msg_cnt': msg_cnt, 'res_file_folder': res_file_folder, 'schema': schema}
+
+        self.close_all_writers()
 
         # Store previous offsets and columns
         state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
@@ -253,15 +263,20 @@ class Component(ComponentBase):
         """
         logging.info(F'Writing file {filename}')
 
-        if not os.path.exists(os.path.dirname(filename)):
-            os.makedirs(os.path.dirname(filename))
-        try:
-            with open(filename, 'a') as file:
-                writer = csv.DictWriter(file, fieldnames=self.columns[topic])
-                writer.writerow(line)
-            logging.info("File saved.")
-        except Exception as e:
-            logging.error("Could not save file! exit.", e)
+        if filename not in self.writers:
+            if not os.path.exists(os.path.dirname(filename)):
+                os.makedirs(os.path.dirname(filename))
+
+            file = open(filename, 'a')
+            writer = csv.DictWriter(file, fieldnames=self.columns[topic])
+            self.writers[filename] = CachedWriter(file=file, writer=writer)
+            logging.info(f"Created new writer for {filename}")
+
+        self.writers[filename].writer.writerow(line)
+
+    def close_all_writers(self):
+        for filename, cached_writer in self.writers.items():
+            cached_writer.file.close()
 
     @sync_action("list_topics")
     def list_topics(self):
