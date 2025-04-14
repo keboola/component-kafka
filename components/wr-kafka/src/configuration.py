@@ -1,8 +1,9 @@
-import logging
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from keboola.component.exceptions import UserException
-from enum import Enum
 import json
+import logging
+from enum import Enum
+
+from keboola.component.exceptions import UserException
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
 class Units(str, Enum):
