@@ -19,14 +19,14 @@ class Configuration(BaseModel):
     topics: list[str] = Field(default=None)
 
     security_protocol: str = Field(default=None)
-    sasl_mechanisms: str = Field(default=None)
+    sasl_mechanism: str = Field(default=None)
 
     username: str = Field(default=None)
     password: str = Field(alias="#password", default=None)
 
-    ssl_ca: str = Field(default=None)
-    ssl_key: str = Field(default=None)
-    ssl_certificate: str = Field(default=None)
+    ssl_ca: str = Field(alias="#ssl_ca", default=None)
+    ssl_key: str = Field(alias="#ssl_key", default=None)
+    ssl_certificate: str = Field(alias="ssl_certificate", default=None)
 
     begin_offsets: str = Field(default=None)
 

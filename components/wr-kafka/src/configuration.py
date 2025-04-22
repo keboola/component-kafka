@@ -24,7 +24,7 @@ class Configuration(BaseModel):
     password: str = Field(alias="#password", default=None)
 
     ssl_ca: str = Field(default=None)
-    ssl_key: str = Field(default=None)
+    ssl_key: str = Field(alias="#ssl_key", default=None)
     ssl_certificate: str = Field(default=None)
 
     kafka_extra_params: str = Field(default=None)

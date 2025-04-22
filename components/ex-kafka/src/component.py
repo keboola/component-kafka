@@ -13,6 +13,8 @@ from typing import TextIO
 
 import polars
 from common.src.kafka_client import KafkaConsumer
+# from components.common.src.kafka_client import KafkaConsumer
+
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -236,7 +238,7 @@ class Component(ComponentBase):
             group_id=params.group_id,
             client_id=params.client_id,
             security_protocol=params.security_protocol,
-            sasl_mechanisms=params.sasl_mechanisms,
+            sasl_mechanisms=params.sasl_mechanism,
             username=params.username,
             password=params.password,
             ssl_ca=params.ssl_ca,
