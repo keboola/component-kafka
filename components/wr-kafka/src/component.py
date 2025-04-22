@@ -188,7 +188,7 @@ class Component(ComponentBase):
             bootstrap_servers=bootstrap_servers,
             client_id=params.client_id,
             security_protocol=params.security_protocol,
-            sasl_mechanisms=params.sasl_mechanisms,
+            sasl_mechanisms=params.sasl_mechanism,
             username=params.username,
             password=params.password,
             ssl_ca=params.ssl_ca,
