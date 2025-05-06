@@ -16,6 +16,7 @@ import fastavro
 import polars
 
 from common.src.kafka_client import KafkaConsumer
+
 # from components.common.src.kafka_client import KafkaConsumer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient

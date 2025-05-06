@@ -1,6 +1,6 @@
 import logging
-import tempfile
 
+from .utils import str_to_file
 from confluent_kafka import Producer, Consumer, TopicPartition
 
 # maximum time (s) the consumer is waiting for next message
@@ -8,7 +8,6 @@ NEXT_MSG_TIMEOUT = 60
 
 
 def build_configuration(
-    self,
     bootstrap_servers,
     client_id,
     logger,
@@ -31,9 +30,9 @@ def build_configuration(
         "sasl.mechanisms": sasl_mechanisms,
         "sasl.username": username,
         "sasl.password": password,
-        "ssl.ca.location": self._create_temp_file(ssl_ca),
-        "ssl.key.location": self._create_temp_file(ssl_key),
-        "ssl.certificate.location": self._create_temp_file(ssl_certificate),
+        "ssl.ca.location": str_to_file(ssl_ca, ".pem"),
+        "ssl.key.location": str_to_file(ssl_key, ".pem"),
+        "ssl.certificate.location": str_to_file(ssl_certificate, ".pem"),
         "logger": logger,
     }
     if debug:
@@ -73,7 +72,6 @@ class KafkaProducer:
         debug=False,
     ):
         configuration = build_configuration(
-            self,
             bootstrap_servers=bootstrap_servers,
             client_id=client_id,
             logger=logger,
@@ -97,14 +95,6 @@ class KafkaProducer:
         self.producer.produce(topic=topic, key=key, value=value)
         self.producer.flush()
 
-    @staticmethod
-    def _create_temp_file(content, suffix=".pem"):
-        if content:
-            temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-            temp_file.write(content.encode())
-            temp_file.close()
-            return temp_file.name
-
 
 class KafkaConsumer:
     def __init__(
@@ -125,7 +115,6 @@ class KafkaConsumer:
         debug=False,
     ):
         configuration = build_configuration(
-            self,
             bootstrap_servers=bootstrap_servers,
             client_id=client_id,
             logger=logger,
@@ -149,14 +138,6 @@ class KafkaConsumer:
         self.start_offsets = start_offset
         self.consumer = Consumer(**configuration)
         logging.debug(self.consumer.assignment())
-
-    @staticmethod
-    def _create_temp_file(content, suffix=".pem"):
-        if content:
-            temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-            temp_file.write(content.encode())
-            temp_file.close()
-            return temp_file.name
 
     def _set_start_offsets(self, consumer, partitions):
         topic = partitions[0].topic
@@ -189,8 +170,8 @@ class KafkaConsumer:
 
             msgs = self.consumer.consume(**consume_pars)
             if not msgs:
-                # polling timeouted, stop
-                logging.info(f"Polling timeouted, there was no message received for more than {NEXT_MSG_TIMEOUT}s")
+                # polling timed out, stop
+                logging.info(f"Polling timed out, there was no message received for more than {NEXT_MSG_TIMEOUT}s")
                 do_poll = False
 
             for msg in msgs:

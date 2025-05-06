@@ -10,17 +10,16 @@ import logging
 import time
 
 import fastavro
-from common.src.kafka_client import KafkaProducer
-
-# from components.common.src.kafka_client import KafkaProducer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
-from fastavro.schema import parse_schema
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
+
+from common.kafka_client import KafkaProducer
+# from components.common.kafka_client import KafkaProducer
 
 
 class Component(ComponentBase):
@@ -76,7 +75,7 @@ class Component(ComponentBase):
             raise UserException("Schema string is required for Avro serialization.")
 
         # Convert the schema string to a fastavro schema
-        self.avro_schema = parse_schema(json.loads(self.params.schema_str))
+        self.avro_schema = fastavro.schema.parse_schema(json.loads(self.params.schema_str))
 
         if self.params.schema_registry_url:
             config = self.params.schema_registry_extra_params
