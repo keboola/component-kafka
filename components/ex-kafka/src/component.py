@@ -7,14 +7,15 @@ import csv
 import json
 import logging
 import os
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TextIO
 
 import polars
 from common.src.kafka_client import KafkaConsumer
-# from components.common.src.kafka_client import KafkaConsumer
 
+# from components.common.src.kafka_client import KafkaConsumer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
@@ -75,12 +76,14 @@ class Component(ComponentBase):
         self.client = self._init_client(debug, self.params, self.latest_offsets, bootstrap_servers)
 
         logging.info("Extracting data from topics {0}".format(self.params.topics))
+        start_time = time.time()
 
         for topic in self.params.topics:
             msg_cnt, res_file_folder, schema = self.consume_topic(topic)
             self.topics[topic] = {"msg_cnt": msg_cnt, "res_file_folder": res_file_folder, "schema": schema}
 
         self.close_all_writers()
+        logging.info(f"Extraction finished in {time.time() - start_time:.2f} seconds")
 
         # Store previous offsets and columns
         state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
@@ -166,6 +169,8 @@ class Component(ComponentBase):
     def get_message_data(self, deserializer, last_message, msg, topic):
         if self.params.deserialize == "avro":
             value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+        elif self.params.deserialize == "json":
+            value = json.loads(msg.value())
         else:
             value = msg.value().decode("utf-8")
         if self.params.freeze_timestamp:  # freeze for datadir tests
