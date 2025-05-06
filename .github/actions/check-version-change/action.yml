@@ -1,0 +1,83 @@
+name: 'Check Version Change'
+description: 'Checks if VERSION file has changed compared to the last tag'
+
+inputs:
+  component:
+    description: 'Component directory path'
+    required: true
+
+outputs:
+  has_version_change:
+    description: 'Whether the Version file has changed since last tag'
+    value: ${{ steps.check.outputs.has_version_change }}
+  version:
+    description: 'Current version from Version file'
+    value: ${{ steps.check.outputs.version }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check version change
+      id: check
+      shell: bash
+      run: |
+        version_file="${{ inputs.component }}/VERSION"
+        
+        # Check if Version file exists
+        if [ ! -f "$version_file" ]; then
+          echo "Version file not found at $version_file"
+          echo "has_version_change=false" >> $GITHUB_OUTPUT
+          echo "version=" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Get current version
+        current_version=$(cat "$version_file")
+        echo "Current version: $current_version"
+        echo "version=$current_version" >> $GITHUB_OUTPUT
+        
+        # Debug git info
+        echo "Git remotes:"
+        git remote -v
+        
+        # Ensure we have all tags
+        echo "Fetching all tags..."
+        git fetch --tags --force --unshallow || git fetch --tags --force
+        
+        # List all tags (without filter first)
+        echo "All available tags:"
+        git tag
+        
+        # Get all tags sorted by version (try both with and without v prefix)
+        all_tags=$(git tag -l "*[0-9].[0-9]*.[0-9]*" --sort=-v:refname)
+        echo "All matching tags found: $all_tags"
+        
+        # Get previous tag (second in the list)
+        previous_tag=$(echo "$all_tags" | sed -n '2p')
+        
+        if [ -n "$previous_tag" ]; then
+          echo "Previous tag: $previous_tag"
+          # Get version from the previous tag
+          git checkout $previous_tag 2>/dev/null
+          if [ -f "$version_file" ]; then
+            tag_version=$(cat "$version_file")
+            echo "Version from previous tag: $tag_version"
+            
+            # Compare versions
+            if [ "$current_version" != "$tag_version" ]; then
+              echo "Version changed from $tag_version to $current_version"
+              echo "has_version_change=true" >> $GITHUB_OUTPUT
+            else
+              echo "Version unchanged"
+              echo "has_version_change=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "VERSION file not found in previous tag"
+            echo "has_version_change=true" >> $GITHUB_OUTPUT
+          fi
+          # Return to original branch
+          git checkout - 2>/dev/null
+        else
+          echo "No previous tag found - considering as version change"
+          echo "has_version_change=true" >> $GITHUB_OUTPUT
+        fi 

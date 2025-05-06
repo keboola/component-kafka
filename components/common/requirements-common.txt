@@ -1,0 +1,8 @@
+keboola.component==1.6.8
+mock
+freezegun
+confluent_kafka[avro, schemaregistry]==2.10.0
+pydantic==2.10.4
+requests==2.32.3
+https://bitbucket.org/kds_consulting_team/datadirtest/get/1.8.3.zip#egg=datadirtest
+polars==1.21.0

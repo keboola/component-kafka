@@ -1,0 +1,30 @@
+{
+  "storage": {
+    "input": {
+      "files": [],
+      "tables": []
+    },
+    "output": {
+      "files": [],
+      "tables": []
+    }
+  },
+  "parameters": {
+    "bootstrap_servers": [
+      "broker:9092"
+    ],
+    "group_id": "my-group2",
+    "security_protocol": "PLAINTEXT",
+    "topics": [
+      "avro-value"
+    ],
+    "deserialize": "avro",
+    "flatten_message_value_columns": false,
+    "schema_registry_url": "http://schema-registry:8081",
+    "debug": true,
+    "freeze_timestamp": true
+  },
+  "image_parameters": {
+    "syrup_url": "https://syrup.keboola.com/"
+  }
+}
