@@ -4,6 +4,7 @@ Template Component main class.
 """
 
 import csv
+import io
 import json
 import logging
 import os
@@ -11,10 +12,10 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TextIO
-
+import fastavro
 import polars
-from common.src.kafka_client import KafkaConsumer
 
+from common.src.kafka_client import KafkaConsumer
 # from components.common.src.kafka_client import KafkaConsumer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -45,6 +46,8 @@ class Component(ComponentBase):
         self.columns = dict()
         self.latest_offsets = dict()
         self.writers: dict[str, CachedWriter] = {}
+        self.schema = None
+        self.registry_deserializer = None
         super().__init__()
 
     def run(self, debug=False):
@@ -128,7 +131,10 @@ class Component(ComponentBase):
     def consume_topic(self, topic):
         self.columns.setdefault(topic, RESULT_COLS)
 
-        deserializer = self.get_deserializer()
+        if self.params.deserialize == "avro" and self.params.schema_registry_url:
+            self.registry_deserializer = self.get_schema_registry_deserializer()
+        elif self.params.deserialize == "avro" and self.params.schema_str:
+            self.schema = fastavro.schema.parse_schema(json.loads(self.params.schema_str))
 
         res_file_folder = os.path.join(self.tables_out_path, topic)
         msg_cnt = 0
@@ -141,7 +147,7 @@ class Component(ComponentBase):
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            extracted_data, last_message = self.get_message_data(deserializer, last_message, msg, topic)
+            extracted_data, last_message = self.get_message_data(last_message, msg, topic)
 
             filename = ("p{0}-{1}.csv").format(
                 msg.partition(),
@@ -166,9 +172,11 @@ class Component(ComponentBase):
 
         return msg_cnt, res_file_folder, dtypes
 
-    def get_message_data(self, deserializer, last_message, msg, topic):
-        if self.params.deserialize == "avro":
-            value = deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+    def get_message_data(self, last_message, msg, topic):
+        if self.params.deserialize == "avro" and self.params.schema_registry_url:
+            value = self.registry_deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
+        elif self.params.deserialize == "avro" and self.params.schema_str:
+            value = fastavro.schemaless_reader(io.BytesIO(msg.value()), self.schema)
         elif self.params.deserialize == "json":
             value = json.loads(msg.value())
         else:
@@ -193,18 +201,11 @@ class Component(ComponentBase):
             extracted_data["value"] = value
         return extracted_data, last_message
 
-    def get_deserializer(self):
-        deserializer = None
-        if self.params.deserialize == "avro":
-            if self.params.schema_registry_url:
-                config = self.params.schema_registry_extra_params
-                config["url"] = self.params.schema_registry_url
-                schema_registry_client = SchemaRegistryClient(config)
-                deserializer = AvroDeserializer(schema_registry_client)
-            elif self.params.schema_str:
-                deserializer = AvroDeserializer(self.params.schema_str)
-            else:
-                raise ValueError("Schema Registry URL or schema string must be provided for Avro deserialization.")
+    def get_schema_registry_deserializer(self):
+        config = self.params.schema_registry_extra_params
+        config["url"] = self.params.schema_registry_url
+        schema_registry_client = SchemaRegistryClient(config)
+        deserializer = AvroDeserializer(schema_registry_client)
         return deserializer
 
     def get_topic_dtypes(self, message_value: str):
