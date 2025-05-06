@@ -1,21 +1,15 @@
 FROM python:3.12-slim
 ENV PYTHONIOENCODING=utf-8
-
 ENV PYTHONPATH="/code:${PYTHONPATH}"
 
 ARG COMPONENT_DIR="wr-kafka"
 
-
 RUN pip install flake8
 
 
-COPY /components/common/src/ /code/common/src/
-COPY /components/common/deploy.sh /code/
 COPY /components/common/requirements-common.txt /code/
 RUN pip install -r /code/requirements-common.txt
-
-COPY /components/${COMPONENT_DIR}/requirements.txt /code/
-RUN pip install -r /code/requirements.txt
+COPY /components/common /code/common/
 
 COPY /components/${COMPONENT_DIR} /code/components/${COMPONENT_DIR}/
 

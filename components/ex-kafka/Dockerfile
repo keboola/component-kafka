@@ -5,16 +5,13 @@ ENV PYTHONPATH="/code:${PYTHONPATH}"
 
 ARG COMPONENT_DIR="ex-kafka"
 
-
 RUN pip install flake8
 
 
-COPY /components/common/src/ /code/common/src/
-COPY /components/common/deploy.sh /code/
 COPY /components/common/requirements-common.txt /code/
 RUN pip install -r /code/requirements-common.txt
 
-COPY /components/${COMPONENT_DIR} /code/components/${COMPONENT_DIR}/
+COPY /components/common /code/common/
 
 COPY /components/${COMPONENT_DIR}/src /code/src/
 COPY /components/${COMPONENT_DIR}/tests /code/tests/

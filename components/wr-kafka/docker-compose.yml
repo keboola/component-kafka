@@ -7,7 +7,7 @@ services:
     volumes:
         - ./:/code
         - ./data:/data
-        - ../common/src:/code/common/src
+        - ../common:/code/common
     environment:
       - KBC_DATADIR=/data
   broker:

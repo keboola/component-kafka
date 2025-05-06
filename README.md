@@ -1,5 +1,5 @@
 # KBC Kafka Components
 
-Simple Kafka consumer for Keboola Connection
-
 Repository contains component ex-kafka and wr-kafka
+
+Documentation is in the README.md files in the component folders.

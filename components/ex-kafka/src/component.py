@@ -12,12 +12,10 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import TextIO
+
 import fastavro
 import polars
-
-from common.src.kafka_client import KafkaConsumer
-
-# from components.common.src.kafka_client import KafkaConsumer
+from common.kafka_client import KafkaConsumer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer

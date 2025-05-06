@@ -6,7 +6,8 @@ Simple Kafka producer for Keboola Connection.
 
 Component supports following security protocols: PLAINTEXT, SASL_PLAINTEXT, SSL
 
-Component supports following serializations of value part of the message: text / JSON / Avro
+The component supports the following value serializations in the message:
+text, JSON, and Avro (either using the Confluent Schema Registry or with a provided Avro schema string if the schema_registry_url parameter is not defined)
 
 Messages can be serialized using Avro serialization if configured. The schema for serialization can be provided as a
 schema string, or obtained from the schema registry if configured.
@@ -47,7 +48,7 @@ specified column, and the message value can include selected columns from the in
 {
   "parameters": {
     "kafka_extra_params": "{\"session.timeout.ms\": 6000 }",
-    "servers": [
+    "bootstrap_servers": [
       "xxx01.srvs.test.com:9094",
       "xxxy-02.srvs.test.com:9094",
       "xxx-03.srvs.test.com:9094"

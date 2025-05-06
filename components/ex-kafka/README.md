@@ -7,8 +7,10 @@ Simple Kafka consumer for Keboola Connection.
 
 Component supports following security protocols: PLAINTEXT, SASL_PLAINTEXT, SSL
 
-Message payload can be either stored raw in the single column of output table or deserialized by Avro deserializer.
-The schema for deserialization can be provided as schema string, or obtained from the schema registry if configured.
+Message payload can be either stored raw in the single column of output table or deserialized by JSON or Avro deserializer.
+
+The schema for Avro deserialization can be provided as schema string, or obtained from the schema registry if configured.
+The component was tested with the Confluent Schema Registry
 If the payload is deserialized, it can be stored either as json in column, or all values flattened to columns.
 
 The consumer persists its "committed" offsets in its own state so it is completely independent of commit states 

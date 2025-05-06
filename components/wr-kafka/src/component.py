@@ -10,6 +10,7 @@ import logging
 import time
 
 import fastavro
+from common.kafka_client import KafkaProducer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
@@ -17,9 +18,6 @@ from confluent_kafka.serialization import MessageField, SerializationContext
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
-
-from common.kafka_client import KafkaProducer
-# from components.common.kafka_client import KafkaProducer
 
 
 class Component(ComponentBase):
