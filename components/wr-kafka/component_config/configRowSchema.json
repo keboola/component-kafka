@@ -4,13 +4,13 @@
   "required": [
   ],
   "properties": {
-    "topics": {
+    "topic": {
       "type": "array",
       "items": {
         "enum": [],
         "type": "string"
       },
-      "title": "Topics to subscribe",
+      "title": "Topic to write",
       "format": "select",
       "options": {
         "tags": true,
