@@ -53,7 +53,7 @@ class Configuration(BaseModel):
 
     @field_validator("kafka_extra_params", "schema_registry_extra_params")
     def parse_configuration(cls, value):
-        if isinstance(value, str):
+        if value and isinstance(value, str):
             try:
                 return json.loads(value.replace("'", '"'))
             except json.JSONDecodeError as e:

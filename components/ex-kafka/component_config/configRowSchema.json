@@ -24,15 +24,17 @@
     },
     "deserialize": {
       "enum": [
-        "no",
-        "avro"
+        "text",
+        "avro",
+        "json"
       ],
       "type": "string",
       "title": "Deserialize message value",
       "options": {
         "enum_titles": [
-          "No",
-          "Avro"
+          "Text (UTF-8)",
+          "Avro",
+          "JSON"
         ]
       },
       "propertyOrder": 2
@@ -55,12 +57,15 @@
         "schema_registry"
       ],
       "type": "string",
-      "title": "Deserialize message value",
+      "title": "Schema source",
       "options": {
         "enum_titles": [
           "User defined",
           "From schema registry"
-        ]
+        ],
+        "dependencies": {
+          "deserialize": "avro"
+        }
       },
       "propertyOrder": 4
     },

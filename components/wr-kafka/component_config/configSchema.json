@@ -39,7 +39,7 @@
       },
       "propertyOrder": 2
     },
-    "sasl_mechanisms": {
+    "sasl_mechanism": {
       "enum": [
         "PLAIN",
         "SCRAM-SHA-512"
