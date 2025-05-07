@@ -1,1 +1,1 @@
-Testing configuration description.
+For details on how to configure the component, please refer to the [documentation](https://github.com/keboola/component-kafka/blob/master/components/ex-kafka/README.md).
