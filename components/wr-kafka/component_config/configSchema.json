@@ -23,32 +23,39 @@
     "security_protocol": {
       "enum": [
         "PLAINTEXT",
+        "SSL",
         "SASL_PLAINTEXT",
-        "SSL"
+        "SASL_SSL"
       ],
       "type": "string",
       "title": "Security protocol",
       "options": {
         "enum_titles": [
           "PLAINTEXT",
+          "SSL",
           "SASL_PLAINTEXT",
-          "SSL"
+          "SASL_SSL"
         ]
       },
       "propertyOrder": 2
     },
     "sasl_mechanisms": {
       "enum": [
-        "PLAIN"
+        "PLAIN",
+        "SCRAM-SHA-512"
       ],
       "type": "string",
       "title": "SASL mechanism",
       "options": {
         "dependencies": {
-          "security_protocol": "SASL_PLAINTEXT"
+          "security_protocol": [
+            "SASL_PLAINTEXT",
+            "SASL_SSL"
+          ]
         },
         "enum_titles": [
-          "PLAIN"
+          "PLAIN",
+          "SCRAM-SHA-512"
         ]
       },
       "propertyOrder": 3
@@ -58,7 +65,10 @@
       "title": "Username",
       "options": {
         "dependencies": {
-          "security_protocol": "SASL_PLAINTEXT"
+          "security_protocol": [
+            "SASL_PLAINTEXT",
+            "SASL_SSL"
+          ]
         }
       },
       "propertyOrder": 4
@@ -69,7 +79,10 @@
       "title": "Password",
       "options": {
         "dependencies": {
-          "security_protocol": "SASL_PLAINTEXT"
+          "security_protocol": [
+            "SASL_PLAINTEXT",
+            "SASL_SSL"
+          ]
         }
       },
       "propertyOrder": 5
@@ -81,7 +94,10 @@
       "options": {
         "tooltip": "Insert the entire contents of the .pem file, including newlines. Once saved, the value will be encrypted.",
         "dependencies": {
-          "security_protocol": "SSL"
+          "security_protocol": [
+            "SSL",
+            "SASL_SSL"
+          ]
         }
       },
       "propertyOrder": 6
@@ -93,7 +109,10 @@
       "options": {
         "tooltip": "Insert the entire contents of the .pem file, including newlines. Once saved, the value will be encrypted.",
         "dependencies": {
-          "security_protocol": "SSL"
+          "security_protocol": [
+            "SSL",
+            "SASL_SSL"
+          ]
         }
       },
       "propertyOrder": 7
@@ -105,7 +124,10 @@
       "options": {
         "tooltip": "Insert the entire contents of the .pem file, including newlines. Once saved, the value will be encrypted.",
         "dependencies": {
-          "security_protocol": "SSL"
+          "security_protocol": [
+            "SSL",
+            "SASL_SSL"
+          ]
         }
       },
       "propertyOrder": 8

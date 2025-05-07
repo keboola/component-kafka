@@ -1,1 +1,1 @@
-TBD
+Apache Kafka is an open-source log-based event streaming platform.
