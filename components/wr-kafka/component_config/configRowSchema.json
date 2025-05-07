@@ -22,17 +22,17 @@
       "uniqueItems": true,
       "propertyOrder": 1
     },
-    "deserialize": {
+    "serialize": {
       "enum": [
         "text",
         "avro",
         "json"
       ],
       "type": "string",
-      "title": "Deserialize message value",
+      "title": "Serialize message value",
       "options": {
         "enum_titles": [
-          "Text",
+          "Text (UTF-8)",
           "Avro",
           "JSON"
         ]
@@ -45,10 +45,10 @@
         "schema_registry"
       ],
       "type": "string",
-      "title": "Deserialization schema source",
+      "title": "Serialization schema source",
       "options": {
         "dependencies": {
-          "deserialize": "avro"
+          "serialize": "avro"
         },
         "enum_titles": [
           "User defined",
@@ -91,35 +91,30 @@
     },
     "key_column_name": {
       "type": "string",
-      "title": "Avro schema string",
-      "options": {
-        "dependencies": {
-          "schema_source": "user_defined"
-        }
+      "title": "Key column name",
+      "watch": {
+        "columns": "_metadata_.table.columns"
       },
+      "enumSource": "columns",
       "propertyOrder": 8
     },
     "value_column_names": {
-          "type": "array",
-          "items": {
-            "enum": [],
-            "type": "string"
-          },
-          "title": "Message value columns",
-          "description": "Columns to be added to the message value payload, if empty all columns will be added.",
-          "format": "select",
-          "options": {
-            "tags": true,
-            "async": {
-              "label": "Re-load columns",
-              "action": "list_columns"
-            },
-            "dependencies": {
-              "mode": "select_columns"
-            }
-          },
-          "uniqueItems": true,
-          "propertyOrder": 9
-        }
+      "type": "array",
+      "items": {
+        "watch": {
+          "columns": "_metadata_.table.columns"
+        },
+        "enumSource": "columns",
+        "type": "string"
+      },
+      "title": "Message value columns",
+      "description": "Columns to be added to the message value payload, if empty all columns will be added.",
+      "format": "select",
+      "options": {
+        "tags": true
+      },
+      "uniqueItems": true,
+      "propertyOrder": 9
+    }
   }
 }

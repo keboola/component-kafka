@@ -202,7 +202,7 @@ class Component(ComponentBase):
         params = Configuration(**self.configuration.parameters)
         bootstrap_servers = ",".join(params.bootstrap_servers)
 
-        c = self._init_client(False, params, dict(), bootstrap_servers)
+        c = self._init_client(False, params, bootstrap_servers)
         topics = c.list_topics()
         topics_names = [SelectElement(topics.get(t).topic) for t in topics]
 
