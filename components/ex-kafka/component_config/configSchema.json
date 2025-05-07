@@ -2,24 +2,24 @@
   "type": "object",
   "title": "Application configuration",
   "required": [
-    "servers"
+    "bootstrap_servers"
   ],
   "properties": {
     "bootstrap_servers": {
-        "type": "array",
-        "uniqueItems": true,
-        "items": {
-          "enum": [],
-          "type": "string"
-        },
-        "options": {
-          "tags": true
-        },
-        "format": "select",
-        "title": "Bootstrap servers",
-        "description": "A list of one or more bootstrap servers in the Kafka cluster, specified in the format host:port.",
-        "propertyOrder": 1
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [],
+        "type": "string"
       },
+      "options": {
+        "tags": true
+      },
+      "format": "select",
+      "title": "Bootstrap servers",
+      "description": "A list of one or more bootstrap servers in the Kafka cluster, specified in the format host:port.",
+      "propertyOrder": 1
+    },
     "security_protocol": {
       "enum": [
         "PLAINTEXT",
@@ -79,6 +79,7 @@
       "format": "password",
       "title": "SSL CA",
       "options": {
+        "tooltip": "Insert the entire contents of the .pem file, including newlines. Once saved, the value will be encrypted.",
         "dependencies": {
           "security_protocol": "SSL"
         }
@@ -90,6 +91,7 @@
       "format": "password",
       "title": "SSL Key",
       "options": {
+        "tooltip": "Insert the entire contents of the .pem file, including newlines. Once saved, the value will be encrypted.",
         "dependencies": {
           "security_protocol": "SSL"
         }
@@ -101,6 +103,7 @@
       "format": "password",
       "title": "SSL Certificate",
       "options": {
+        "tooltip": "Insert the entire contents of the .pem file, including newlines. Once saved, the value will be encrypted.",
         "dependencies": {
           "security_protocol": "SSL"
         }
@@ -110,13 +113,13 @@
     "kafka_extra_params": {
       "type": "string",
       "title": "Additional Kafka parameters",
-        "description": "Dictionary of additional <a href='https://kafka.apache.org/documentation/#configuration'>Kafka parameters</a> in the format {\"auto.offset.reset\": \"earliest\", \"session.timeout.ms\": 6000\n} ",
+      "description": "Dictionary of additional <a href='https://kafka.apache.org/documentation/#configuration'>Kafka parameters</a> in the format {\"auto.offset.reset\": \"earliest\", \"session.timeout.ms\": 6000\n} ",
       "propertyOrder": 9
     },
     "group_id": {
       "type": "string",
       "title": "Group ID",
-        "description": "Group ID for the consumer",
+      "description": "Group ID for the consumer",
       "propertyOrder": 10
     }
   }
