@@ -15,7 +15,7 @@ class Configuration(BaseModel):
     bootstrap_servers: list[str] = Field(default=None)
     client_id: str = Field(default=None)
 
-    topic: str
+    topic: str = Field(default=None)
 
     security_protocol: str = Field(default=None)
     sasl_mechanism: str = Field(default=None)
