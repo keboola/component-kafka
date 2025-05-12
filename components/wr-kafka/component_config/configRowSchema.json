@@ -4,22 +4,22 @@
   "required": [
   ],
   "properties": {
-    "topics": {
-      "type": "array",
+    "topic": {
+      "type": "string",
+      "enum": [],
       "items": {
         "enum": [],
         "type": "string"
       },
-      "title": "Topics to subscribe",
-      "format": "select",
+      "title": "Topic to write",
       "options": {
-        "tags": true,
         "async": {
+          "cache": false,
           "label": "Load topics",
-          "action": "list_topics"
+          "action": "list_topics",
+          "autoload": []
         }
       },
-      "uniqueItems": true,
       "propertyOrder": 1
     },
     "serialize": {
