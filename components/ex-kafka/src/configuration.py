@@ -33,7 +33,7 @@ class Configuration(BaseModel):
     kafka_extra_params: str = Field(default=None)
 
     deserialize: str = Field(default=None)
-    flatten_message_value_columns: bool = True
+    flatten_message_value_columns: bool = False
     schema_str: str = Field(default=None)
     schema_registry_url: str = Field(default=None)
     schema_registry_extra_params: str = Field(default={})
