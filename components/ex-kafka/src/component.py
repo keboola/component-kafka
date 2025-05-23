@@ -301,7 +301,6 @@ class Component(ComponentBase):
         bootstrap_servers = ",".join(self.params.bootstrap_servers)
 
         c = self._init_client(False, self.params, dict(), bootstrap_servers)
-        deserializer = self.get_deserializer()
         last_message = None
         topic = self.params.topics[0]
         for msg in c.consume_message_batch(topic):
@@ -311,7 +310,7 @@ class Component(ComponentBase):
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            extracted_data, _ = self.get_message_data(deserializer, last_message, msg, topic)
+            extracted_data, _ = self.get_message_data(last_message, msg, topic)
 
             polars.Config.set_tbl_formatting("ASCII_MARKDOWN")
             polars.Config.set_tbl_hide_dataframe_shape(True)
