@@ -3,12 +3,22 @@ import logging
 from enum import Enum
 
 from keboola.component.exceptions import UserException
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, computed_field
 
 
-class Units(str, Enum):
-    metric = "metric"
-    imperial = "imperial"
+class LoadType(str, Enum):
+    full_load = "full_load"
+    incremental_load = "incremental_load"
+
+
+class Destination(BaseModel):
+    load_type: LoadType = Field(default=LoadType.incremental_load)
+    table_name: str | None = None
+
+    @computed_field
+    @property
+    def incremental(self) -> bool:
+        return self.load_type is LoadType.incremental_load
 
 
 class Configuration(BaseModel):
@@ -37,6 +47,8 @@ class Configuration(BaseModel):
     schema_str: str = Field(default=None)
     schema_registry_url: str = Field(default=None)
     schema_registry_extra_params: str = Field(default={})
+
+    destination: Destination = Field(default_factory=Destination)
 
     debug: bool = False
     freeze_timestamp: bool = False
