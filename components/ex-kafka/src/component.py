@@ -101,6 +101,10 @@ class Component(ComponentBase):
             logging.info("Extraction finished.")
         except KafkaException as e:
             raise UserException(f"Kafka Exception: {str(e)}")
+        finally:
+            if self.client.consumer:
+                self.client.consumer.close()
+                logging.info("Kafka client closed.")
 
     def _validate_stack_params(self):
         image_parameters = self.configuration.image_parameters or {}
