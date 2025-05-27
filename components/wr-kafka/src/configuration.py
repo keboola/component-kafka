@@ -6,9 +6,9 @@ from keboola.component.exceptions import UserException
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
-class Units(str, Enum):
-    metric = "metric"
-    imperial = "imperial"
+class KeySource(str, Enum):
+    table = "input_table"
+    configuration = "configuration"
 
 
 class Configuration(BaseModel):
@@ -29,6 +29,8 @@ class Configuration(BaseModel):
 
     kafka_extra_params: str = Field(default=None)
 
+    key_source: KeySource = Field(default=KeySource.table)
+    key: str = ""
     key_column_name: str = ""
     value_column_names: list[str] = []
     serialize: str = Field(default=None)

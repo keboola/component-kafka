@@ -222,6 +222,61 @@ class TestKafkaWriter(unittest.TestCase):
                 expected_item, consumed_messages_sorted[i], f"Message at index {i} doesn't match expected data"
             )
 
+    def test_text_key_from_config(self):
+        data_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "test-data", "text-key-from-config", "source"
+        )
+        os.environ["KBC_DATADIR"] = data_dir
+        topic = "test-text-key-from-config"
+
+        component = Component()
+        component.execute_action()
+        time.sleep(2)
+
+        self.consumer.subscribe([topic])
+
+        # Read expected output data for comparison
+        expected_output_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "test-data", "text-key-from-config", "expected", "out.csv"
+        )
+
+        expected = polars.read_csv(expected_output_path, infer_schema=False).to_dicts()
+
+        # Consume messages and verify
+        consumed_messages = []
+        consumed_message_keys = []
+        for _ in range(len(expected)):
+            msg = self.consumer.poll(timeout=5.0)
+            if msg is None or msg.error():
+                if msg and msg.error().code() != KafkaError._PARTITION_EOF:
+                    print(f"Consumer error: {msg.error()}")
+                break
+
+            # Decode the text message - which is a string representation of a dictionary
+            text_value = msg.value().decode("utf-8")
+
+            json_str = text_value.replace("'", '"')
+            dict_value = json.loads(json_str)
+            consumed_messages.append(dict_value)
+            consumed_message_keys.append(msg.key().decode("utf-8"))
+
+        time.sleep(1)
+
+        self.assertEqual(
+            len(expected), len(consumed_messages), "Number of consumed messages doesn't match expected count"
+        )
+
+        # Sort by row_number for comparison
+        consumed_messages_sorted = sorted(consumed_messages, key=lambda x: x["row_number"])
+
+        for i, expected_item in enumerate(expected):
+            self.assertEqual(
+                expected_item, consumed_messages_sorted[i], f"Message at index {i} doesn't match expected data"
+            )
+
+        for key in consumed_message_keys:
+            self.assertEqual(key, "config")
+
 
 if __name__ == "__main__":
     unittest.main()

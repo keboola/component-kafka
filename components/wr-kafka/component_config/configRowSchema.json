@@ -89,6 +89,23 @@
       },
       "propertyOrder": 7
     },
+    "key_source": {
+      "enum": [
+        "input_table",
+        "configuration"
+      ],
+      "type": "string",
+      "title": "Messages Key Source",
+      "default": "from_input_table",
+      "options": {
+        "enum_titles": [
+          "Input Table",
+          "Configuration"
+        ]
+      },
+      "description": "Key of the messages can either be specified for each message in the input table, or defined once for the entire table.",
+      "propertyOrder": 8
+    },
     "key_column_name": {
       "type": "string",
       "title": "Key column name",
@@ -96,7 +113,22 @@
         "columns": "_metadata_.table.columns"
       },
       "enumSource": "columns",
-      "propertyOrder": 8
+      "options": {
+        "dependencies": {
+          "key_source": "input_table"
+        }
+      },
+      "propertyOrder": 9
+    },
+    "key_value": {
+      "type": "string",
+      "title": "Key",
+      "options": {
+        "dependencies": {
+          "key_source": "configuration"
+        }
+      },
+      "propertyOrder": 10
     },
     "value_column_names": {
       "type": "array",
@@ -114,7 +146,7 @@
         "tags": true
       },
       "uniqueItems": true,
-      "propertyOrder": 9
+      "propertyOrder": 11
     }
   }
 }
