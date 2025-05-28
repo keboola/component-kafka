@@ -44,7 +44,7 @@ def build_configuration(
                 "session.timeout.ms": 6000,
                 # we are controlling offset ourselves, by default start from start
                 "auto.offset.reset": "earliest",
-                "enable.auto.commit": True,
+                "enable.auto.commit": False,
             }
         )
 

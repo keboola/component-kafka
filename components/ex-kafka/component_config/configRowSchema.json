@@ -111,6 +111,40 @@
         }
       },
       "propertyOrder": 8
+    },
+    "destination": {
+      "type": "object",
+      "title": "Destination",
+      "required": [
+        "load_type"
+      ],
+      "properties": {
+        "load_type": {
+          "enum": [
+            "incremental_load",
+            "full_load"
+          ],
+          "type": "string",
+          "title": "Load Type",
+          "default": "incremental_load",
+          "options": {
+            "enum_titles": [
+              "Incremental Load",
+              "Full Load"
+            ]
+          },
+          "description": "If Full load is used, the destination table will be overwritten every run. If Incremental Load is used, data will be upserted into the destination table based on the primary key. Append modes do not contain any primary keys and are not deduplicated.",
+          "propertyOrder": 91
+        },
+        "table_name": {
+          "type": "string",
+          "title": "Table name",
+          "default": "",
+          "description": "(Optional) Specify the table name. If left blank, the topic name will be used.",
+          "propertyOrder": 92
+        }
+      },
+      "propertyOrder": 9
     }
   }
 }

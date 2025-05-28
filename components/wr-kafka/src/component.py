@@ -11,7 +11,7 @@ import time
 
 import fastavro
 from common.kafka_client import KafkaProducer
-from configuration import Configuration
+from configuration import Configuration, KeySource
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
@@ -94,7 +94,11 @@ class Component(ComponentBase):
 
     def write_line(self, row):
         topic = self.params.topic
-        key = row.get(self.params.key_column_name, None)
+
+        if self.params.key_source == KeySource.configuration:
+            key = self.params.key
+        else:
+            key = row.get(self.params.key_column_name)
 
         if self.params.value_column_names:
             value = {col: row[col] for col in self.params.value_column_names}

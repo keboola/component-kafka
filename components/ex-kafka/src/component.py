@@ -15,6 +15,7 @@ from typing import TextIO
 
 import fastavro
 import polars
+from confluent_kafka import KafkaException
 from common.kafka_client import KafkaConsumer
 from configuration import Configuration
 from confluent_kafka.schema_registry import SchemaRegistryClient
@@ -61,39 +62,49 @@ class Component(ComponentBase):
          See https://github.com/edenhill/librdkafka/wiki/Statistics” for more information.
         """
 
-        self.params = Configuration(**self.configuration.parameters)
-        self._validate_stack_params()
+        try:
+            self.params = Configuration(**self.configuration.parameters)
+            self._validate_stack_params()
 
-        self.params.group_id = (
-            f"kbc-proj-{self.environment_variables.project_id or 'local'}-{self.environment_variables.config_row_id}"
-        )
-        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id or 'local'}"
+            self.params.group_id = (f"kbc-proj-{self.environment_variables.project_id or 'local'}-"
+                                    f"{self.environment_variables.config_row_id}")
+            self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id or 'local'}"
 
-        # Generating a string out of the list
-        bootstrap_servers = ",".join(self.params.bootstrap_servers)
+            # Generating a string out of the list
+            bootstrap_servers = ",".join(self.params.bootstrap_servers)
 
-        self.columns = self.get_state_file().get("columns", dict())
-        self.latest_offsets = self.get_state_file().get("prev_offsets", dict())
+            self.columns = self.get_state_file().get("columns", dict())
+            self.latest_offsets = self.get_state_file().get("prev_offsets", dict())
 
-        self.client = self._init_client(debug, self.params, self.latest_offsets, bootstrap_servers)
+            self.client = self._init_client(debug, self.params, self.latest_offsets, bootstrap_servers)
 
-        logging.info("Extracting data from topics {0}".format(self.params.topics))
-        start_time = time.time()
+            logging.info("Extracting data from topics {0}".format(self.params.topics))
+            start_time = time.time()
 
-        for topic in self.params.topics:
-            msg_cnt, res_file_folder, schema = self.consume_topic(topic)
-            self.topics[topic] = {"msg_cnt": msg_cnt, "res_file_folder": res_file_folder, "schema": schema}
+            for topic in self.params.topics:
+                msg_cnt, res_file_folder, schema = self.consume_topic(topic)
+                self.topics[topic] = {
+                    "msg_cnt": msg_cnt,
+                    "res_file_folder": res_file_folder,
+                    "schema": schema,
+                }
 
-        self.close_all_writers()
-        logging.info(f"Extraction finished in {time.time() - start_time:.2f} seconds")
+            self.close_all_writers()
+            logging.info(f"Extraction finished in {time.time() - start_time:.2f} seconds")
 
-        # Store previous offsets and columns
-        state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
-        self.write_state_file(state_dict)
-        logging.info("Offset file stored.")
+            # Store previous offsets and columns
+            state_dict = {"prev_offsets": self.latest_offsets, "columns": self.columns}
+            self.write_state_file(state_dict)
+            logging.info("Offset file stored.")
 
-        self.produce_manifest()
-        logging.info("Extraction finished.")
+            self.produce_manifest()
+            logging.info("Extraction finished.")
+        except KafkaException as e:
+            raise UserException(f"Kafka Exception: {str(e)}")
+        finally:
+            if self.client.consumer:
+                self.client.consumer.close()
+                logging.info("Kafka client closed.")
 
     def _validate_stack_params(self):
         image_parameters = self.configuration.image_parameters or {}
@@ -120,7 +131,11 @@ class Component(ComponentBase):
             if consumed["msg_cnt"] > 0:
                 logging.info(f"Fetched {consumed['msg_cnt']} messages from topic - {topic}")
                 out_table = self.create_out_table_definition(
-                    consumed["res_file_folder"], is_sliced=True, primary_key=RESULT_PK, schema=schema, incremental=True
+                    consumed["res_file_folder"],
+                    is_sliced=True,
+                    primary_key=RESULT_PK,
+                    schema=schema,
+                    incremental=self.params.destination.incremental,
                 )
 
                 self.write_manifest(out_table)
@@ -135,7 +150,8 @@ class Component(ComponentBase):
         elif self.params.deserialize == "avro" and self.params.schema_str:
             self.schema = fastavro.schema.parse_schema(json.loads(self.params.schema_str))
 
-        res_file_folder = os.path.join(self.tables_out_path, topic)
+        table_name = self.params.destination.table_name or topic
+        res_file_folder = os.path.join(self.tables_out_path, table_name)
         msg_cnt = 0
         last_message = None
         dtypes = []
@@ -301,7 +317,6 @@ class Component(ComponentBase):
         bootstrap_servers = ",".join(self.params.bootstrap_servers)
 
         c = self._init_client(False, self.params, dict(), bootstrap_servers)
-        deserializer = self.get_deserializer()
         last_message = None
         topic = self.params.topics[0]
         for msg in c.consume_message_batch(topic):
@@ -311,7 +326,7 @@ class Component(ComponentBase):
                 logging.error("Consumer error: {}".format(msg.error()))
                 continue
 
-            extracted_data, _ = self.get_message_data(deserializer, last_message, msg, topic)
+            extracted_data, _ = self.get_message_data(last_message, msg, topic)
 
             polars.Config.set_tbl_formatting("ASCII_MARKDOWN")
             polars.Config.set_tbl_hide_dataframe_shape(True)
