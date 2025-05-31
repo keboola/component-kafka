@@ -30,32 +30,35 @@ class Component(ComponentBase):
         super().__init__()
 
     def run(self, debug=False):
-        self.params = Configuration(**self.configuration.parameters)
-        self._validate_stack_params()
+        try:
+            self.params = Configuration(**self.configuration.parameters)
+            self._validate_stack_params()
 
-        self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
+            self.params.client_id = f"kbc-config-{self.environment_variables.config_row_id}" or "kbc-config-0"
 
-        bootstrap_servers = ",".join(self.params.bootstrap_servers)
-        self.client = self._init_client(debug, self.params, bootstrap_servers)
+            bootstrap_servers = ",".join(self.params.bootstrap_servers)
+            self.client = self._init_client(debug, self.params, bootstrap_servers)
 
-        if self.params.serialize == "avro":
-            self._init_avro_serializer()
+            if self.params.serialize == "avro":
+                self._init_avro_serializer()
 
-        input_tables = self.get_input_tables_definitions()
+            input_tables = self.get_input_tables_definitions()
 
-        if len(input_tables) != 1:
-            raise UserException("Exactly one input table is expected.")
+            if len(input_tables) != 1:
+                raise UserException("Exactly one input table is expected.")
 
-        input_table = input_tables[0]
+            input_table = input_tables[0]
 
-        logging.info(f"Writing data from table: {input_table.name} to the topic: {self.params.topic}")
+            logging.info(f"Writing data from table: {input_table.name} to the topic: {self.params.topic}")
 
-        start_time = time.time()
+            start_time = time.time()
 
-        with open(input_table.full_path, "r") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                self.write_line(row)
+            with open(input_table.full_path, "r") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    self.write_line(row)
+        except Exception as e:
+            raise UserException(f"Error during run: {str(e)}")
 
         logging.info(f"Writing finished in {time.time() - start_time:.2f} seconds")
 
