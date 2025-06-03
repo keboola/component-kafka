@@ -108,9 +108,14 @@ class Component(ComponentBase):
         else:
             value = row
 
-        serialized_value = self.serialize(value, topic)
+        if self.params.serialize.lower() == 'no':
+            if len(self.params.value_column_names) != 1:
+                raise UserException("When serialize is set to 'no', exactly one value column must be specified.")
+            final_value = row.get(self.params.value_column_names[0], "").encode()
+        else:
+            final_value = self.serialize(value, topic)
 
-        self.client.produce_message(topic, key, serialized_value)
+        self.client.produce_message(topic, key, final_value)
 
     def serialize(self, value, topic):
         serialize_method = self.params.serialize.lower()
