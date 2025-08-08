@@ -108,7 +108,7 @@ class Component(ComponentBase):
         else:
             value = row
 
-        if self.params.serialize.lower() == 'no':
+        if self.params.serialize.lower() == "no":
             if len(self.params.value_column_names) != 1:
                 raise UserException("When serialize is set to 'no', exactly one value column must be specified.")
             final_value = row.get(self.params.value_column_names[0], "").encode()
