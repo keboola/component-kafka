@@ -1,5 +1,7 @@
 # KBC Kafka Components
 
-Repository contains component ex-kafka and wr-kafka
+This repository contains following components:
 
-Documentation is in the README.md files in the component folders.
+**ex-kafka** - extract data from Kafka topics to Keboola in batches [README](components/ex-kafka/README.md)
+
+**wr-kafka** - write data from Keboola to Kafka topics in batches [README](components/wr-kafka/README.md)
