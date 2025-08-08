@@ -9,8 +9,7 @@ Component supports following security protocols: PLAINTEXT, SASL_PLAINTEXT, SSL
 The component supports the following value serializations in the message:
 text, JSON, and Avro (either using the Confluent Schema Registry or with a provided Avro schema string if the schema_registry_url parameter is not defined)
 
-Messages can be serialized using Avro serialization if configured. The schema for serialization can be provided as a
-schema string, or obtained from the schema registry if configured.
+Alternatively, the component can read pre-serialized messages from the input table and publish them unchanged to the Kafka topic.
 
 The component reads data from input tables and produces messages to a Kafka topic. The message key can be set from a
 specified column, and the message value can include selected columns from the input data.
@@ -34,7 +33,7 @@ specified column, and the message value can include selected columns from the in
 - **key_column_name** - [OPT] Name of the column in input table to use as message key. Default is empty string.
 - **value_column_names** - [OPT] List of column names in input table to include in the message value. Default is an
   empty list.
-- **serialize** - [OPT] Serialization method. Possible values: `text`, `avro`, `json`,
+- **serialize** - [OPT] Serialization method. Possible values: `text`, `avro`, `json`, `no`
 - **schema_str** - [OPT] Argument to specify Avro schema as string. Required if `serialize` is set to `avro`.
 - **schema_registry_url** - [OPT] Optional argument to specify URL of Schema Registry. Required if using schema registry
   for Avro serialization.
