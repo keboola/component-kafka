@@ -77,6 +77,11 @@ class TestKafkaWriter(unittest.TestCase):
                 if msg and msg.error().code() != KafkaError._PARTITION_EOF:
                     print(f"Consumer error: {msg.error()}")
                 break
+            if msg is None:
+                break
+            if msg.error() and msg.error().code() != KafkaError._PARTITION_EOF:
+                print(f"Consumer error: {msg.error()}")
+                break
 
             value = deserializer(msg.value(), SerializationContext(topic, MessageField.VALUE))
             consumed_messages.append(value)
@@ -273,6 +278,56 @@ class TestKafkaWriter(unittest.TestCase):
             self.assertEqual(
                 expected_item, consumed_messages_sorted[i], f"Message at index {i} doesn't match expected data"
             )
+
+        for key in consumed_message_keys:
+            self.assertEqual(key, "config")
+
+    def test_string_with_bytes(self):
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test-data", "string-with-bytes", "source")
+        os.environ["KBC_DATADIR"] = data_dir
+        topic = "test-string-with-bytes"
+
+        component = Component()
+        component.execute_action()
+        time.sleep(2)
+
+        self.consumer.subscribe([topic])
+
+        # Read expected output data for comparison
+        expected_output_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "test-data", "string-with-bytes", "expected", "out.csv"
+        )
+
+        expected = polars.read_csv(expected_output_path, infer_schema=False).to_dicts()
+
+        # Consume messages and verify
+        consumed_messages = []
+        consumed_message_keys = []
+        for _ in range(len(expected)):
+            msg = self.consumer.poll(timeout=5.0)
+            if msg is None or msg.error():
+                if msg and msg.error().code() != KafkaError._PARTITION_EOF:
+                    print(f"Consumer error: {msg.error()}")
+                break
+
+            message = {
+                "row_number": msg.key().decode("utf-8"),
+                "payload": msg.value().decode("utf-8"),
+            }
+
+            consumed_messages.append(message)
+
+        time.sleep(1)
+
+        self.assertEqual(
+            len(expected), len(consumed_messages), "Number of consumed messages doesn't match expected count"
+        )
+
+        # Sort by row_number for comparison
+        consumed_messages_sorted = sorted(consumed_messages, key=lambda x: x["row_number"])
+
+        for i, expected_item in enumerate(expected):
+            self.assertEqual(expected_item, consumed_messages[i], f"Message at index {i} doesn't match expected data")
 
         for key in consumed_message_keys:
             self.assertEqual(key, "config")
