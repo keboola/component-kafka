@@ -1,1 +1,1 @@
-Apache Kafka is an open-source log-based event streaming platform.
+Produces messages to an Apache Kafka topic from input table rows.
