@@ -3,15 +3,13 @@ name: ex-kafka
 
 on:
   push:
-    branches:
-     - 'feature/*'
-     - 'fix/*'
-     - '*' 
+    branches-ignore:
+      - master
     tags:
-      - '*' # Skip the workflow on the main branch without tag
+      - '*'
     paths:
       - 'components/ex-kafka/**'
-      - '../../components/common'
+      - 'components/common/**'
       - '.github/workflows/**'
 
 concurrency: ci-${{ github.workflow }}-${{ github.ref }}
