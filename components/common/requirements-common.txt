@@ -1,4 +1,4 @@
-keboola.component==1.6.8
+keboola.component==1.11.0
 mock
 freezegun
 confluent_kafka[avro, schemaregistry]==2.10.0
