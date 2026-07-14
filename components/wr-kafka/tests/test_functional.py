@@ -1,4 +1,3 @@
-import csv
 import io
 import json
 import os
@@ -327,7 +326,9 @@ class TestKafkaWriter(unittest.TestCase):
         consumed_messages_sorted = sorted(consumed_messages, key=lambda x: x["row_number"])
 
         for i, expected_item in enumerate(expected):
-            self.assertEqual(expected_item, consumed_messages[i], f"Message at index {i} doesn't match expected data")
+            self.assertEqual(
+                expected_item, consumed_messages_sorted[i], f"Message at index {i} doesn't match expected data"
+            )
 
         for key in consumed_message_keys:
             self.assertEqual(key, "config")
