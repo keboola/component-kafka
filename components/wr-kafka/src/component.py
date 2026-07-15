@@ -100,16 +100,19 @@ class Component(ComponentBase):
         else:
             key = row.get(self.params.key_column_name)
 
-        if self.params.value_column_names:
-            value = {col: row[col] for col in self.params.value_column_names}
-        else:
-            value = row
-
         if self.params.serialize.lower() == "no":
             if len(self.params.value_column_names) != 1:
                 raise UserException("When serialize is set to 'no', exactly one value column must be specified.")
-            final_value = row.get(self.params.value_column_names[0], "").encode()
+            value_column_name = self.params.value_column_names[0]
+            if value_column_name not in row:
+                raise UserException(f"Value column '{value_column_name}' not found in the input table.")
+            raw_value = row[value_column_name]
+            final_value = raw_value if isinstance(raw_value, bytes) else str(raw_value).encode("utf-8")
         else:
+            if self.params.value_column_names:
+                value = {col: row[col] for col in self.params.value_column_names}
+            else:
+                value = row
             final_value = self.serialize(value, topic)
 
         self.client.produce_message(topic, key, final_value)

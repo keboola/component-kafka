@@ -76,11 +76,6 @@ class TestKafkaWriter(unittest.TestCase):
                 if msg and msg.error().code() != KafkaError._PARTITION_EOF:
                     print(f"Consumer error: {msg.error()}")
                 break
-            if msg is None:
-                break
-            if msg.error() and msg.error().code() != KafkaError._PARTITION_EOF:
-                print(f"Consumer error: {msg.error()}")
-                break
 
             value = deserializer(msg.value(), SerializationContext(topic, MessageField.VALUE))
             consumed_messages.append(value)
@@ -301,7 +296,6 @@ class TestKafkaWriter(unittest.TestCase):
 
         # Consume messages and verify
         consumed_messages = []
-        consumed_message_keys = []
         for _ in range(len(expected)):
             msg = self.consumer.poll(timeout=5.0)
             if msg is None or msg.error():
@@ -309,6 +303,8 @@ class TestKafkaWriter(unittest.TestCase):
                     print(f"Consumer error: {msg.error()}")
                 break
 
+            # The message key is set from the row_number column (see test-data config), so it is
+            # verified as part of the dict comparison below rather than as a separate assertion.
             message = {
                 "row_number": msg.key().decode("utf-8"),
                 "payload": msg.value().decode("utf-8"),
@@ -329,9 +325,6 @@ class TestKafkaWriter(unittest.TestCase):
             self.assertEqual(
                 expected_item, consumed_messages_sorted[i], f"Message at index {i} doesn't match expected data"
             )
-
-        for key in consumed_message_keys:
-            self.assertEqual(key, "config")
 
 
 if __name__ == "__main__":

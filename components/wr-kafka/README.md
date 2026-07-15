@@ -9,7 +9,9 @@ Component supports following security protocols: PLAINTEXT, SASL_PLAINTEXT, SSL
 The component supports the following value serializations in the message:
 text, JSON, and Avro (either using the Confluent Schema Registry or with a provided Avro schema string if the schema_registry_url parameter is not defined)
 
-Alternatively, the component can read pre-serialized messages from the input table and publish them unchanged to the Kafka topic.
+Alternatively, setting `serialize` to `no` publishes the message value unchanged (no re-serialization) — the input table
+column already contains the finished, pre-serialized payload (e.g. raw JSON produced upstream). This mode requires
+`value_column_names` to contain **exactly one** column name; that column's value is UTF-8 encoded and produced as-is.
 
 The component reads data from input tables and produces messages to a Kafka topic. The message key can be set from a
 specified column, and the message value can include selected columns from the input data.
@@ -72,6 +74,20 @@ specified column, and the message value can include selected columns from the in
       "address"
     ],
     "serialize": "json",
+  }
+}
+```
+
+### Example row configuration JSON - pre-serialized passthrough (`serialize: no`)
+
+```
+{
+  "parameters": {
+    "key_column_name": "order_id",
+    "value_column_names": [
+      "payload"
+    ],
+    "serialize": "no",
   }
 }
 ```
