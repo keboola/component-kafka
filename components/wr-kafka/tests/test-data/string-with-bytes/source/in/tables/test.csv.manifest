@@ -12,13 +12,8 @@
     "is_alias": false,
     "attributes": [],
     "columns": [
-        "Type",
-        "Campaign_Name",
-        "Status",
-        "Start_Date",
-        "End_Date",
-        "Location",
-        "Eventbrite_link"
+        "row_number",
+        "payload"
     ],
     "metadata": [
         {
@@ -27,50 +22,10 @@
             "value": "transformation",
             "provider": "system",
             "timestamp": "2018-03-02T15:37:02+0100"
-        },
-        {
-            "id": "18271582",
-            "key": "KBC.createdBy.configuration.id",
-            "value": "361585608",
-            "provider": "system",
-            "timestamp": "2018-03-02T15:37:02+0100"
-        },
-        {
-            "id": "18271583",
-            "key": "KBC.createdBy.configurationRow.id",
-            "value": "361585762",
-            "provider": "system",
-            "timestamp": "2018-03-02T15:37:02+0100"
-        },
-        {
-            "id": "18271584",
-            "key": "KBC.lastUpdatedBy.component.id",
-            "value": "transformation",
-            "provider": "system",
-            "timestamp": "2018-03-02T15:37:02+0100"
-        },
-        {
-            "id": "18271585",
-            "key": "KBC.lastUpdatedBy.configuration.id",
-            "value": "361585608",
-            "provider": "system",
-            "timestamp": "2018-03-02T15:37:02+0100"
-        },
-        {
-            "id": "18271586",
-            "key": "KBC.lastUpdatedBy.configurationRow.id",
-            "value": "361585762",
-            "provider": "system",
-            "timestamp": "2018-03-02T15:37:02+0100"
         }
     ],
     "column_metadata": {
-        "Type": [],
-        "Campaign_Name": [],
-        "Status": [],
-        "Start_Date": [],
-        "End_Date": [],
-        "Location": [],
-        "Eventbrite_link": []
+        "row_number": [],
+        "payload": []
     }
 }

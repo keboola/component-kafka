@@ -11,7 +11,8 @@ text, JSON, and Avro (either using the Confluent Schema Registry or with a provi
 
 Alternatively, setting `serialize` to `no` publishes the message value unchanged (no re-serialization) — the input table
 column already contains the finished, pre-serialized payload (e.g. raw JSON produced upstream). This mode requires
-`value_column_names` to contain **exactly one** column name; that column's value is UTF-8 encoded and produced as-is.
+`value_column_names` to contain **exactly one** column name; that column's value is produced as-is (string values are
+UTF-8 encoded, `bytes` values are passed through unchanged).
 
 The component reads data from input tables and produces messages to a Kafka topic. The message key can be set from a
 specified column, and the message value can include selected columns from the input data.

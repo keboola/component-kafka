@@ -294,14 +294,19 @@ class TestKafkaWriter(unittest.TestCase):
 
         expected = polars.read_csv(expected_output_path, infer_schema=False).to_dicts()
 
-        # Consume messages and verify
+        # Consume messages and verify. Poll until all expected messages arrive or an overall
+        # deadline is reached, so a slow broker/consumer startup (first poll timing out) does not
+        # cut the loop short and make the test flaky.
         consumed_messages = []
-        for _ in range(len(expected)):
+        deadline = time.monotonic() + 30.0
+        while len(consumed_messages) < len(expected) and time.monotonic() < deadline:
             msg = self.consumer.poll(timeout=5.0)
-            if msg is None or msg.error():
-                if msg and msg.error().code() != KafkaError._PARTITION_EOF:
+            if msg is None:
+                continue
+            if msg.error():
+                if msg.error().code() != KafkaError._PARTITION_EOF:
                     print(f"Consumer error: {msg.error()}")
-                break
+                continue
 
             # The message key is set from the row_number column (see test-data config), so it is
             # verified as part of the dict comparison below rather than as a separate assertion.
@@ -311,8 +316,6 @@ class TestKafkaWriter(unittest.TestCase):
             }
 
             consumed_messages.append(message)
-
-        time.sleep(1)
 
         self.assertEqual(
             len(expected), len(consumed_messages), "Number of consumed messages doesn't match expected count"
