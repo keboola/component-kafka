@@ -1,0 +1,31 @@
+{
+    "id": "in.c-test.test",
+    "uri": "https:\/\/connection.keboola.com\/v2\/storage\/tables\/in.c-test.test",
+    "name": "test",
+    "primary_key": [],
+    "indexed_columns": [],
+    "created": "2018-03-02T15:36:50+0100",
+    "last_change_date": "2018-03-02T15:36:54+0100",
+    "last_import_date": "2018-03-02T15:36:54+0100",
+    "rows_count": 0,
+    "data_size_bytes": 0,
+    "is_alias": false,
+    "attributes": [],
+    "columns": [
+        "row_number",
+        "payload"
+    ],
+    "metadata": [
+        {
+            "id": "18271581",
+            "key": "KBC.createdBy.component.id",
+            "value": "transformation",
+            "provider": "system",
+            "timestamp": "2018-03-02T15:37:02+0100"
+        }
+    ],
+    "column_metadata": {
+        "row_number": [],
+        "payload": []
+    }
+}

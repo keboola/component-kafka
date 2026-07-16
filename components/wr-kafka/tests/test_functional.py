@@ -1,4 +1,3 @@
-import csv
 import io
 import json
 import os
@@ -276,6 +275,59 @@ class TestKafkaWriter(unittest.TestCase):
 
         for key in consumed_message_keys:
             self.assertEqual(key, "config")
+
+    def test_string_with_bytes(self):
+        data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test-data", "string-with-bytes", "source")
+        os.environ["KBC_DATADIR"] = data_dir
+        topic = "test-string-with-bytes"
+
+        component = Component()
+        component.execute_action()
+        time.sleep(2)
+
+        self.consumer.subscribe([topic])
+
+        # Read expected output data for comparison
+        expected_output_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "test-data", "string-with-bytes", "expected", "out.csv"
+        )
+
+        expected = polars.read_csv(expected_output_path, infer_schema=False).to_dicts()
+
+        # Consume messages and verify. Poll until all expected messages arrive or an overall
+        # deadline is reached, so a slow broker/consumer startup (first poll timing out) does not
+        # cut the loop short and make the test flaky.
+        consumed_messages = []
+        deadline = time.monotonic() + 30.0
+        while len(consumed_messages) < len(expected) and time.monotonic() < deadline:
+            msg = self.consumer.poll(timeout=5.0)
+            if msg is None:
+                continue
+            if msg.error():
+                if msg.error().code() != KafkaError._PARTITION_EOF:
+                    print(f"Consumer error: {msg.error()}")
+                continue
+
+            # The message key is set from the row_number column (see test-data config), so it is
+            # verified as part of the dict comparison below rather than as a separate assertion.
+            message = {
+                "row_number": msg.key().decode("utf-8"),
+                "payload": msg.value().decode("utf-8"),
+            }
+
+            consumed_messages.append(message)
+
+        self.assertEqual(
+            len(expected), len(consumed_messages), "Number of consumed messages doesn't match expected count"
+        )
+
+        # Sort by row_number for comparison
+        consumed_messages_sorted = sorted(consumed_messages, key=lambda x: x["row_number"])
+
+        for i, expected_item in enumerate(expected):
+            self.assertEqual(
+                expected_item, consumed_messages_sorted[i], f"Message at index {i} doesn't match expected data"
+            )
 
 
 if __name__ == "__main__":

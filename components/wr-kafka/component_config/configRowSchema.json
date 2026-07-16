@@ -26,7 +26,8 @@
       "enum": [
         "text",
         "avro",
-        "json"
+        "json",
+        "no"
       ],
       "type": "string",
       "title": "Serialize message value",
@@ -34,7 +35,8 @@
         "enum_titles": [
           "Text (UTF-8)",
           "Avro",
-          "JSON"
+          "JSON",
+          "No serialization (payload in input table is already serialized)"
         ]
       },
       "propertyOrder": 2
