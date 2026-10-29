@@ -175,8 +175,6 @@ class Component(ComponentBase):
             self.save_file(extracted_data, os.path.join(res_file_folder, filename), topic)
             msg_cnt += 1
 
-            print(msg.partition())
-
             if msg.topic() not in self.latest_offsets:
                 self.latest_offsets[msg.topic()] = {}
 
@@ -283,8 +281,6 @@ class Component(ComponentBase):
         """
         Save text as file
         """
-        logging.info(f"Writing file {filename}")
-
         if filename not in self.writers:
             if not os.path.exists(os.path.dirname(filename)):
                 os.makedirs(os.path.dirname(filename))

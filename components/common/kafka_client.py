@@ -159,12 +159,11 @@ class KafkaConsumer:
         # get highest offset for current topic
         max_offsets = self._get_max_offsets(topic)
 
-        logging.info(f"Subscribed to the topic {topic}")
+        logging.info(f"Subscribed to the topic {topic}, reading messages")
         # Data extraction
         do_poll = True
         # poll until timeout is reached or the max offset is received
         while do_poll:
-            logging.info("Reading...")
             consume_pars = dict()
             consume_pars["timeout"] = NEXT_MSG_TIMEOUT
 
